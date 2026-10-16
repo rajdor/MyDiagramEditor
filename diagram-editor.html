@@ -1900,8 +1900,7 @@ function getHandles() {
       for (let i = 0; i < pts.length - 1; i++) {
         const a = pts[i], b = pts[i + 1], m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
         if (dist(a, b) < 16 / z) continue;
-        if (i > 0 && i < pts.length - 2) out.push({ type: 'seg', i, x: m.x, y: m.y, horiz: Math.abs(a.y - b.y) < 0.5 });
-        else out.push({ type: 'addwp', i: 'orth', x: m.x, y: m.y });
+        out.push({ type: 'seg', i, x: m.x, y: m.y, horiz: Math.abs(a.y - b.y) < 0.5 });
       }
     } else {
       const all = [pts[0]].concat(c.pts || [], [pts[pts.length - 1]]);
@@ -2291,7 +2290,7 @@ function startHandleDrag(h, w, ev, pre) {
   else if (h.type === 'wp') S.drag = { type: 'wp', id: c.id, i: h.i, pre, start: w };
   else if (h.type === 'seg') {
     const r = S.routes.get(c.id);
-    S.drag = { type: 'seg', id: c.id, i: h.i, horiz: h.horiz, pre, start: w, base: r.pts.slice(1, -1).map(p => ({ x: p.x, y: p.y })) };
+    S.drag = { type: 'seg', id: c.id, i: h.i, horiz: h.horiz, split: ev.shiftKey, pre, start: w, base: r.pts.map(p => ({ x: p.x, y: p.y })) };
   } else if (h.type === 'addwp') {
     S.drag = { type: 'addwp', id: c.id, h, pre, start: w };
   } else if (h.type === 'cpoint') { S.selPoint = h.i; S.drag = { type: 'cpoint', id: c.id, i: h.i, pre, start: w, old: getPoints(c)[h.i].slice() }; requestRender(); }
@@ -2364,11 +2363,25 @@ function onPointerMove(ev) {
   if (d.type === 'seg') {
     if (!d.moved && dist(w, d.start) * S.zoom < 3) return;
     d.moved = true;
-    const e = cellById(d.id), i = d.i - 1; // pts index of segment start (route index i -> pts i-1)
-    const p = snapPoint(w, alt);
-    e.pts = d.base.map(q => ({ x: q.x, y: q.y }));
-    if (d.horiz) { if (e.pts[i]) e.pts[i].y = p.y; if (e.pts[i + 1]) e.pts[i + 1].y = p.y; }
-    else { if (e.pts[i]) e.pts[i].x = p.x; if (e.pts[i + 1]) e.pts[i + 1].x = p.x; }
+    const e = cellById(d.id), R = d.base.map(q => ({ x: q.x, y: q.y })), n = R.length, j = d.i, STUB = 20;
+    const a = R[j], b = R[j + 1], L = dist(a, b) || 1, u = { x: (b.x - a.x) / L, y: (b.y - a.y) / L };
+    const p = snapPoint(w, alt), coord = d.horiz ? p.y : p.x;
+    const mv = (q) => d.horiz ? { x: q.x, y: coord } : { x: coord, y: q.y };
+    let out;
+    if (d.split) { // Shift: put a bend in the middle third of the segment
+      const m1 = { x: a.x + u.x * L / 3, y: a.y + u.y * L / 3 }, m2 = { x: a.x + u.x * 2 * L / 3, y: a.y + u.y * 2 * L / 3 };
+      out = R.slice(0, j + 1).concat([m1, mv(m1), mv(m2), m2], R.slice(j + 1));
+    } else {
+      const first = j === 0, last = j === n - 2;
+      const head = R.slice(0, first ? 1 : j), tail = R.slice(last ? n - 1 : j + 2), mids = [];
+      if (first) { const A = { x: a.x + u.x * Math.min(STUB, L / 3), y: a.y + u.y * Math.min(STUB, L / 3) }; mids.push(A, mv(A)); } else mids.push(mv(a));
+      if (last) { const B = { x: b.x - u.x * Math.min(STUB, L / 3), y: b.y - u.y * Math.min(STUB, L / 3) }; mids.push(mv(B), B); } else mids.push(mv(b));
+      out = head.concat(mids, tail);
+    }
+    const clean = [];
+    for (const q of out) { const l = clean[clean.length - 1]; if (!l || Math.abs(l.x - q.x) > 0.5 || Math.abs(l.y - q.y) > 0.5) clean.push(q); }
+    for (let k = clean.length - 2; k >= 1; k--) { const x0 = clean[k - 1], x1 = clean[k], x2 = clean[k + 1]; if ((Math.abs(x0.x - x1.x) < 0.5 && Math.abs(x1.x - x2.x) < 0.5) || (Math.abs(x0.y - x1.y) < 0.5 && Math.abs(x1.y - x2.y) < 0.5)) clean.splice(k, 1); }
+    e.pts = clean.slice(1, -1).map(q => ({ x: round2(q.x), y: round2(q.y) }));
     requestRender(); return;
   }
   if (d.type === 'label') {
@@ -2983,21 +2996,40 @@ function copySel(internalOnly) {
 function pasteClip(dup) {
   if (!S.clipboard) return;
   S.clipboard.n++;
-  const off = 20 * S.clipboard.n;
+  const step = 15 * S.clipboard.n;
   mutate(() => {
     const cells = S.clipboard.cells.map(deep), m = new Map();
     for (const c of cells) m.set(c.id, uid());
     const ids = new Set(cells.map(c => c.id));
+    // bounding box of the copied items, to decide where the copy lands
+    const tmpMap = new Map(page().cells.concat(cells).map(c => [c.id, c]));
+    let box = null;
+    for (const c of cells) {
+      if (c.isEdgeLabel || isGroup(c)) continue;
+      if (c.e) { const pts = (c.pts || []).concat(c.sp ? [c.sp] : [], c.tp ? [c.tp] : []); if (pts.length) box = unionBox(box, bboxOf(pts)); }
+      else box = unionBox(box, worldBox(c));
+    }
+    let dx = step, dy = step;
+    if (box) {
+      const r = vpRect(), vis = { x: -S.tx / S.zoom, y: -S.ty / S.zoom, w: r.width / S.zoom, h: r.height / S.zoom };
+      const nb = { x: box.x + dx, y: box.y + dy, w: box.w, h: box.h };
+      const inside = nb.x >= vis.x && nb.y >= vis.y && nb.x + nb.w <= vis.x + vis.w && nb.y + nb.h <= vis.y + vis.h;
+      if (!inside) { const margin = 20 / S.zoom; dx = vis.x + margin - box.x; dy = vis.y + margin - box.y; }
+    }
     for (const c of cells) {
       c.id = m.get(c.id);
       if (m.has(c.parent)) c.parent = m.get(c.parent); else if (!c.isEdgeLabel) c.parent = page().layers[0].id;
       if (c.e) {
-        c.source = c.source && ids.has(c.source) ? m.get(c.source) : null; c.target = c.target && ids.has(c.target) ? m.get(c.target) : null;
-        c.pts = (c.pts || []).map(p => ({ x: p.x + off, y: p.y + off }));
-        if (c.sp) c.sp = { x: c.sp.x + off, y: c.sp.y + off }; if (c.tp) c.tp = { x: c.tp.x + off, y: c.tp.y + off };
-      } else if (!c.isEdgeLabel) { c.x += off; c.y += off; }
+        const keepS = c.source && ids.has(c.source), keepT = c.target && ids.has(c.target);
+        // an end attached to a shape that was not copied becomes a free end where it currently is
+        if (!keepS || !keepT) { const r = edgeRoute(Object.assign({}, c, { source: c.source && tmpMap.has(c.source) ? c.source : null, target: c.target && tmpMap.has(c.target) ? c.target : null }), tmpMap); if (!keepS) c.sp = { x: r.pts[0].x, y: r.pts[0].y }; if (!keepT) c.tp = { x: r.pts[r.pts.length - 1].x, y: r.pts[r.pts.length - 1].y }; }
+        c.source = keepS ? m.get(c.source) : null; c.target = keepT ? m.get(c.target) : null;
+        if (!keepS) for (const k of ['exitX', 'exitY', 'exitDx', 'exitDy']) delete c.style[k];
+        if (!keepT) for (const k of ['entryX', 'entryY', 'entryDx', 'entryDy']) delete c.style[k];
+        c.pts = (c.pts || []).map(p => ({ x: p.x + dx, y: p.y + dy }));
+        if (c.sp) c.sp = { x: c.sp.x + dx, y: c.sp.y + dy }; if (c.tp) c.tp = { x: c.tp.x + dx, y: c.tp.y + dy };
+      } else if (!c.isEdgeLabel) { c.x += dx; c.y += dy; }
     }
-    // edges whose terminals were not copied become dangling at their old positions
     page().cells.push(...cells);
     S.sel = topUnits(cells.filter(c => !c.isEdgeLabel)).map(c => c.id);
   });
@@ -3271,7 +3303,7 @@ function formatLine(edges) {
   const r6 = frow(s);
   if (edges.length === 1) r6.appendChild(mkBtn('Add label', () => addLabelToEdge(e)));
   r6.appendChild(mkBtn('Reset path', () => applyStyle(c => { c.pts = []; }, c => c.e)));
-  const h = document.createElement('p'); h.className = 'hint'; h.textContent = 'Drag the end dots onto a shape (or one of its × points) to connect. Drag the small handles to reshape. Double-click a waypoint to remove it, or the line to add a label.'; s.appendChild(h);
+  const h = document.createElement('p'); h.className = 'hint'; h.textContent = 'Drag the end dots onto a shape (or one of its × points) to connect. Drag a segment handle to move that part of the line; on elbow lines each drag adds bends, and Shift+drag puts a new bend in the middle of a segment. Use Reset path to start again. Double-click a waypoint to remove it, or the line to add a label.'; s.appendChild(h);
 }
 function formatGeometry(c) {
   const s = fsec(isGroup(c) ? 'Group' : 'Size and position');
