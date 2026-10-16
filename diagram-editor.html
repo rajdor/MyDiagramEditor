@@ -1801,13 +1801,15 @@ function requestRender() { if (!renderPending) { renderPending = true; requestAn
 function renderAll() {
   $('#view').setAttribute('transform', `translate(${S.tx},${S.ty}) scale(${S.zoom})`);
   $('#htmlLayer').style.transform = `translate(${S.tx}px,${S.ty}px) scale(${S.zoom})`;
-  $('#stage').classList.toggle('norulers', !page().rulers);
+  $('#stage').classList.toggle('norulers', !page().rulers || !!S.clean);
+  const bg = pageBackground(page());
+  $('#stage').style.background = bg;
   renderGrid(); renderContent(); renderOverlay(); renderRulers();
 }
 function renderGrid() {
   const pg = page(), layer = $('#gridLayer'), defs = $('#defs');
   layer.innerHTML = '';
-  if (!pg.gridVisible) return;
+  if (!pg.gridVisible || S.clean) return;
   const gs0 = pg.gridSize, r = vpRect(), z = S.zoom;
   const major0 = Math.max(1, S.prefs.gridMajor | 0);
   let gs = gs0, majorOnly = false;
@@ -1915,8 +1917,10 @@ function hitHandle(w) {
   for (let i = hs.length - 1; i >= 0; i--) if (dist(hs[i], w) <= tol) return hs[i];
   return null;
 }
+function pageBackground(pg) { const b = pg.modelAttrs && pg.modelAttrs.background; return b && b !== 'none' && b !== 'default' ? b : '#ffffff'; }
 function renderOverlay() {
   const ov = $('#overlay'); ov.innerHTML = '';
+  if (S.clean) return;
   const z = S.zoom, pg = page(), sw = 1 / z;
   // user guides
   if (pg.guidesVisible) {
@@ -1963,7 +1967,7 @@ function renderOverlay() {
   // connection points of hovered shape
   const hv = S.hover && cellById(S.hover);
   if (hv && isConnectable(hv) && S.editPoints !== hv.id && !(S.drag && ['move', 'resize', 'rotate', 'marquee', 'pan'].includes(S.drag.type))) {
-    getPoints(hv).forEach((p, i) => {
+    offeredPoints(hv).forEach((p, i) => {
       const q = constraintPoint(hv, p), active = S.hoverPoint && S.hoverPoint.id === hv.id && S.hoverPoint.i === i;
       const s = (active ? 5 : 3.5) * sw;
       el('path', { d: `M${q.x - s},${q.y - s}L${q.x + s},${q.y + s}M${q.x - s},${q.y + s}L${q.x + s},${q.y - s}`, stroke: active ? '#16a34a' : '#2563eb', 'stroke-width': (active ? 2.2 : 1.5) * sw }, ov);
@@ -1991,7 +1995,7 @@ function labelRectWorld(id) {
 
 /* ---------- rulers ---------- */
 function renderRulers() {
-  if (!page().rulers) return;
+  if (!page().rulers || S.clean) return;
   const top = $('#rulerTop'), left = $('#rulerLeft'), dpr = window.devicePixelRatio || 1;
   const z = S.zoom, sel = selCells();
   let sb_ = null; for (const c of sel) sb_ = unionBox(sb_, c.e ? (S.routes.get(c.id) ? bboxOf(S.routes.get(c.id).pts) : null) : worldBox(c));
@@ -2074,10 +2078,48 @@ function hitGuide(w) {
   for (let i = pg.guides.length - 1; i >= 0; i--) { const g = pg.guides[i]; if (Math.abs((g.o === 'h' ? w.y : w.x) - g.p) <= tol) return i; }
   return -1;
 }
+/* Connection points offered to the user scale with the shape's size on screen:
+   small shapes offer fewer points (tiny ones none), large shapes offer more. Shapes whose
+   points were customised keep exactly their own points (thinned only when too crowded). */
+const POINT_SPACING = 40, POINT_MIN_GAP = 14, POINT_MIN_SHAPE = 12;
+function samePointSet(a, b) { if (a.length !== b.length) return false; const k = (p) => round3(p[0]) + ',' + round3(p[1]); const sa = new Set(a.map(k)); return b.every(p => sa.has(k(p))); }
+function densityPoints(c) {
+  const z = S.zoom, k = shapeKind(c), out = [];
+  const count = (len) => { let n = Math.max(1, Math.round(len / POINT_SPACING)); if (n % 2 === 0) n -= 1; return Math.min(n, 9); };
+  const along = (a, b, len) => { const n = count(len); for (let i = 1; i <= n; i++) { const t = i / (n + 1); out.push([round3(a[0] + (b[0] - a[0]) * t), round3(a[1] + (b[1] - a[1]) * t)]); } };
+  if (k === 'ellipse' || k === 'cloud') {
+    let n = Math.round(Math.PI * (c.w + c.h) / 2 * z / POINT_SPACING / 4) * 4; n = clamp(n, 4, 32);
+    for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + i * 2 * Math.PI / n; out.push([round3(0.5 + 0.5 * Math.cos(a)), round3(0.5 + 0.5 * Math.sin(a))]); }
+    return out;
+  }
+  if (EDGE_POINT_KINDS.has(k) || k === 'rhombus' || k === 'parallelogram') {
+    const poly = outlineLocal(c).map(p => [(p.x - c.x) / Math.max(1, c.w), (p.y - c.y) / Math.max(1, c.h)]);
+    for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; out.push(a.map(round3)); along(a, b, Math.hypot((b[0] - a[0]) * c.w, (b[1] - a[1]) * c.h) * z); }
+    return out;
+  }
+  const ty = k === 'folder' ? round3(clamp(sn(c.style, 'tabHeight', 24) / Math.max(1, c.h), 0, 0.9)) : 0;
+  along([0, ty], [1, ty], c.w * z); along([1, ty], [1, 1], c.h * (1 - ty) * z); along([0, 1], [1, 1], c.w * z); along([0, ty], [0, 1], c.h * (1 - ty) * z);
+  return out;
+}
+function offeredPoints(c) {
+  const z = S.zoom;
+  if (Math.min(c.w, c.h) * z < POINT_MIN_SHAPE) return [];
+  const stored = getPoints(c);
+  const custom = !samePointSet(stored, defaultPoints(c));
+  const cand = custom ? stored : densityPoints(c);
+  // priority: side middles and corners first, so they survive thinning on small shapes
+  const pri = (p) => (Math.abs(p[0] - 0.5) < 0.01 || Math.abs(p[1] - 0.5) < 0.01) ? 0 : ((p[0] === 0 || p[0] === 1) && (p[1] === 0 || p[1] === 1) ? 1 : 2);
+  const order = cand.map((p, i) => ({ p, i })).sort((a, b) => pri(a.p) - pri(b.p) || a.i - b.i);
+  const kept = [];
+  for (const o of order) { const q = constraintPoint(c, o.p); if (kept.every(k => dist(k.q, q) * z >= POINT_MIN_GAP)) kept.push({ p: o.p, q, i: o.i }); }
+  return kept.sort((a, b) => a.i - b.i).map(k => k.p);
+}
 function hoverPointAt(c, w) {
   if (!isConnectable(c)) return null;
-  const tol = 10 / S.zoom; let best = null;
-  getPoints(c).forEach((p, i) => { const q = constraintPoint(c, p), d = dist(q, w); if (d <= tol && (!best || d < best.d)) best = { id: c.id, i, rel: p, d, pt: q }; });
+  // inside the shape the catch area is small, so the body can still be grabbed and moved
+  const inside = pointInPoly(rot(w, cellCenter(c), -cellRot(c)), outlineLocal(c));
+  const tol = (inside ? 5 : 10) / S.zoom; let best = null;
+  offeredPoints(c).forEach((p, i) => { const q = constraintPoint(c, p), d = dist(q, w); if (d <= tol && (!best || d < best.d)) best = { id: c.id, i, rel: p, d, pt: q }; });
   return best;
 }
 function selectionUnit(c) {
@@ -2308,7 +2350,7 @@ function onPointerMove(ev) {
     let near = hv;
     if (!near && S.hover) { const pc = cellById(S.hover); if (pc && isConnectable(pc)) { hp = hoverPointAt(pc, w); if (hp) near = pc; } }
     const changed = (S.hover !== (near ? near.id : null)) || JSON.stringify(S.hoverPoint && [S.hoverPoint.id, S.hoverPoint.i]) !== JSON.stringify(hp && [hp.id, hp.i]);
-    S.hover = near ? near.id : null; S.hoverPoint = S.editPoints ? null : hp;
+    S.hover = near ? near.id : null; S.hoverPoint = S.editPoints || S.clean ? null : hp;
     const hh = hitHandle(w);
     $('#svg').style.cursor = hh ? handleCursor(hh) : (S.hoverPoint ? 'crosshair' : (c ? 'move' : (hitGuide(w) >= 0 && !page().guidesLocked ? (page().guides[hitGuide(w)].o === 'h' ? 'ns-resize' : 'ew-resize') : 'default')));
     if (changed) requestRender();
@@ -2680,6 +2722,7 @@ function onKeyDown(e) {
   if (mod && k === '-') return run('zoomOut');
   if (mod && k === '0') return run('zoom100');
   if (mod && e.shiftKey && k === 'h') return run('fit');
+  if (mod && e.shiftKey && k === 'e') return run('toggleClean');
   if (mod && e.shiftKey && k === 'f') return run('toFront');
   if (mod && e.shiftKey && k === 'b') return run('toBack');
   if (mod && k === 'l') return run('lock');
@@ -2689,6 +2732,7 @@ function onKeyDown(e) {
     if (S.selGuides.length) { mutate(() => { const rm = new Set(S.selGuides); page().guides = page().guides.filter((g, i) => !rm.has(i)); S.selGuides = []; }); return; }
     return run('delete');
   }
+  if (e.key === 'Escape' && S.clean) { runCommand('toggleClean'); return; }
   if (e.key === 'Escape') { if (S.editPoints) { S.editPoints = null; buildFormat(); requestRender(); return; } setSel([]); S.selGuides = []; requestRender(); return; }
   if (e.key === 'Enter' || e.key === 'F2') { const c = singleSel(); if (c && !c.e) { e.preventDefault(); startEdit(c); } return; }
   if (e.key.startsWith('Arrow')) {
@@ -2755,6 +2799,8 @@ const COMMANDS = {
   delete: () => deleteSel(), selectAll: () => setSel(topUnits(page().cells.filter(c => !c.isEdgeLabel && !isGroup(c) || isGroup(c))).filter(c => !c.isEdgeLabel).map(c => selectionUnitTop(c).id).filter((v, i, a) => a.indexOf(v) === i)),
   copyXml: () => copyAsXml(),
   zoomIn: () => setZoom(S.zoom * 1.2), zoomOut: () => setZoom(S.zoom / 1.2), zoom100: () => setZoom(1), fit: () => fitView(),
+  toggleClean: () => { S.clean = !S.clean; S.hover = null; S.hoverPoint = null; if (S.clean) { if (S.editing) finishEdit(); toast('Screenshot mode: press Esc or Ctrl+Shift+E to return'); } requestRender(); updateToolbar(); },
+  canvasBg: () => canvasBgDialog(),
   toggleGrid: () => mutate(() => { page().gridVisible = !page().gridVisible; }),
   toggleSnap: () => mutate(() => { page().grid = !page().grid; }),
   toggleRulers: () => mutate(() => { page().rulers = !page().rulers; }),
@@ -2798,6 +2844,7 @@ function menuDefs() {
     ],
     View: [
       { t: 'Zoom in', c: 'zoomIn', sc: 'Ctrl++' }, { t: 'Zoom out', c: 'zoomOut', sc: 'Ctrl+-' }, { t: 'Actual size', c: 'zoom100', sc: 'Ctrl+0' }, { t: 'Fit diagram', c: 'fit', sc: 'Ctrl+Shift+H' }, '-',
+      Object.assign({ t: 'Screenshot mode (hide grid, rulers, guides, selection)', c: 'toggleClean', sc: 'Ctrl+Shift+E' }, chk(S.clean)), { t: 'Canvas background colour…', c: 'canvasBg' }, '-',
       Object.assign({ t: 'Show grid', c: 'toggleGrid' }, chk(pg.gridVisible)), Object.assign({ t: 'Snap to grid', c: 'toggleSnap' }, chk(pg.grid)),
       Object.assign({ t: 'Smart guides', c: 'toggleSmart' }, chk(pg.smartGuides)), Object.assign({ t: 'Rulers', c: 'toggleRulers' }, chk(pg.rulers)), '-',
       Object.assign({ t: 'Show guides', c: 'toggleGuides' }, chk(pg.guidesVisible)), Object.assign({ t: 'Lock guides', c: 'lockGuides' }, chk(pg.guidesLocked)),
@@ -2877,10 +2924,23 @@ function buildToolbar() {
   B('group', 'Group (Ctrl+G)', 'group'); B('ungroup', 'Ungroup (Ctrl+Shift+G)', 'ungroup'); B('front', 'Bring to front', 'toFront'); B('back', 'Send to back', 'toBack'); sep();
   B('arrange', 'Auto arrange shapes', 'arrangeShapes');
   const sk = B('sketch', 'Sketch style (hand-drawn)', 'toggleSketch', '<span>Sketch</span>'); sk.id = 'sketchBtn'; sep();
+  const cb = B('fit', 'Screenshot mode: hide grid, rulers, guides and selection (Ctrl+Shift+E, Esc to leave)', 'toggleClean', '<span>Screenshot</span>'); cb.id = 'cleanBtn'; cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg><span>Screenshot</span>'; sep();
   B('exportI', 'Export PNG', 'exportPng', '<span>Export</span>');
   updateZoomLabel();
 }
-function updateToolbar() { const sk = $('#sketchBtn'); if (sk) sk.classList.toggle('on', !!S.doc.sketch); }
+function updateToolbar() { const sk = $('#sketchBtn'); if (sk) sk.classList.toggle('on', !!S.doc.sketch); const cl = $('#cleanBtn'); if (cl) cl.classList.toggle('on', !!S.clean); }
+function canvasBgDialog() {
+  const pg = page(), cur = pageBackground(pg);
+  const d = document.createElement('div'); d.style.width = '330px';
+  const presets = ['#ffffff', '#f8fafc', '#f1f5f9', '#fffbeb', '#ecfdf5', '#eff6ff', '#1e293b', '#0f172a'];
+  d.innerHTML = '<div class="swatches" style="grid-template-columns:repeat(8,1fr)">' + presets.map(c => '<div class="sw" data-c="' + c + '" title="' + c + '" style="background:' + c + ';border-color:#cbd5e1"></div>').join('') + '</div><div class="frow"><label class="l">Custom</label><input type="color" id="bgC"></div><p class="hint">Applies to this page. Saved in the file as the draw.io page background, and used for PNG, SVG and PDF exports.</p>';
+  const inp = d.querySelector('#bgC'); inp.value = /^#[0-9a-f]{6}$/i.test(cur) ? cur : '#ffffff';
+  const pre = snapshot();
+  const set = (c) => { pg.modelAttrs = pg.modelAttrs || {}; if (c.toLowerCase() === '#ffffff') delete pg.modelAttrs.background; else pg.modelAttrs.background = c; inp.value = c; requestRender(); };
+  d.querySelectorAll('.sw').forEach(sw => sw.onclick = () => set(sw.dataset.c));
+  inp.oninput = () => set(inp.value);
+  const m = modal('Canvas background', d, [{ t: 'Cancel', fn: () => { restoreQuiet(pre); afterChange(); } }, { t: 'OK', primary: true, fn: () => { if (snapshot() !== pre) pushUndo(pre); afterChange(); } }]);
+}
 
 /* ---------- palette ---------- */
 function buildPalette() {
@@ -3787,7 +3847,7 @@ function buildExportSvg(srcPage, opts) {
   if (!bb.width && !bb.height) bb = { x: 0, y: 0, width: 100, height: 60 };
   const pad = 12, x = Math.floor(bb.x - pad), y = Math.floor(bb.y - pad), w = Math.ceil(bb.width + pad * 2), h = Math.ceil(bb.height + pad * 2);
   svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`); svg.setAttribute('width', w); svg.setAttribute('height', h);
-  if (opts.bg !== false) svg.insertBefore(el('rect', { x, y, width: w, height: h, fill: '#ffffff' }), g);
+  if (opts.bg !== false) svg.insertBefore(el('rect', { x, y, width: w, height: h, fill: pageBackground(srcPage) }), g);
   if (usesSketchFont) { const st = el('style'); st.textContent = "@font-face{font-family:'Architects Daughter';src:url(data:font/woff2;base64," + FONT_B64 + ") format('woff2');}"; svg.insertBefore(st, svg.firstChild); }
   return { svg: new XMLSerializer().serializeToString(svg), w, h };
 }
@@ -4081,7 +4141,7 @@ function guideDialog(i) {
 }
 document.addEventListener('DOMContentLoaded', init);
 /* small scripting hook, used by the self-tests */
-window.DiagramEditor = { S, renderAll, computeRoutes, page, runCommand, serializeDoc, parseDrawio, loadText, buildExportSvg, renderToCanvas, mutate, makeVertex, makeEdge, makeEdgeLabel, refreshMap, toScreen, cellById, getPoints, constraintPoint, edgeRoute, exportGliffy, GLIFFY_TRANSFORMS, layeredLayout, applyShapeLayout, minimiseCrossings, countAllCrossings, setSel, fitView, makePdf, deep };
+window.DiagramEditor = { S, renderAll, offeredPoints, computeRoutes, page, runCommand, serializeDoc, parseDrawio, loadText, buildExportSvg, renderToCanvas, mutate, makeVertex, makeEdge, makeEdgeLabel, refreshMap, toScreen, cellById, getPoints, constraintPoint, edgeRoute, exportGliffy, GLIFFY_TRANSFORMS, layeredLayout, applyShapeLayout, minimiseCrossings, countAllCrossings, setSel, fitView, makePdf, deep };
 
 })();
 </script>
