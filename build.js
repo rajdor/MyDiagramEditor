@@ -39,7 +39,7 @@ const app = [
   'const STENCIL_CODES = ' + JSON.stringify({ person: code('person'), people: code('people') }) + ';',
   'const FONT_B64 = "' + fontB64 + '";',
   'const PHOSPHOR_B64 = "' + ph.b64 + '";',
-  src('core.js'), src('styles.js'), src('contrast.js'), src('icons.js'), src('mxroute.js'), src('render.js'), src('ui1.js'), src('ui2.js'), src('ui3.js')
+  src('core.js'), src('styles.js'), src('blueprint.js'), src('contrast.js'), src('icons.js'), src('mxroute.js'), src('render.js'), src('ui1.js'), src('ui2.js'), src('ui3.js'), src('embed.js')
 ].join('\n');
 
 let html = src('index.html')

@@ -43,6 +43,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .tb { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 30px; height: 30px; padding: 0 7px; border: 0; background: none; border-radius: var(--btnRadius); cursor: pointer; color: var(--tbText); white-space: nowrap; }
 .tb:hover { background: var(--chrome); box-shadow: var(--raise); }
 .tb.on { background: var(--accentSoft); color: var(--accent); box-shadow: var(--inset); }
+.tb.primary, .tb.primary:hover { background: var(--accent); color: #ffffff; font-weight: 600; padding: 0 14px; }
+#embedCancel { margin-left: auto; }
 .tb svg { width: 18px; height: 18px; }
 .tbsep { width: 1px; height: 22px; background: var(--chrome2); margin: 0 6px; flex: none; }
 #zoomLabel { min-width: 52px; }

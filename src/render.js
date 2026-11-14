@@ -33,7 +33,10 @@ function shapePaths(c) {
     for (const l of ls) R.push({ d: pathAbsToD(l.cmds, s, tx, ty), fill: true, glyph: true, alpha: l.alpha });
     return R;
   }
-  if (k === 'ellipse') R.push({ d: ellD(x, y, w, h), fill: true });
+  if (k === 'ellipse') {
+    R.push({ d: ellD(x, y, w, h), fill: true });
+    if (st.deHarvey !== undefined) { const wd = harveyWedge(x, y, w, h, harveyOf(st)); if (wd) R.push({ d: wd, fill: true, wedge: true }); }
+  }
   else if (k === 'cloud') {
     const X = (f) => x + f * w, Y = (f) => y + f * h;
     R.push({ d: `M${X(0.25)},${Y(0.25)}C${X(0.05)},${Y(0.25)} ${X(0)},${Y(0.5)} ${X(0.16)},${Y(0.55)}C${X(0)},${Y(0.66)} ${X(0.18)},${Y(0.9)} ${X(0.31)},${Y(0.8)}C${X(0.4)},${Y(1)} ${X(0.7)},${Y(1)} ${X(0.8)},${Y(0.8)}C${X(1)},${Y(0.8)} ${X(1)},${Y(0.6)} ${X(0.875)},${Y(0.5)}C${X(1)},${Y(0.3)} ${X(0.8)},${Y(0.1)} ${X(0.625)},${Y(0.2)}C${X(0.5)},${Y(0.05)} ${X(0.3)},${Y(0.05)} ${X(0.25)},${Y(0.25)}Z`, fill: true });
@@ -136,7 +139,47 @@ function labelBox(c) {
   if (lp === 'left') x -= c.w; else if (lp === 'right') x += c.w;
   if (vlp === 'top') y -= c.h; else if (vlp === 'bottom') y += c.h;
   const sp = sn(st, 'spacing', 2), sl = sn(st, 'spacingLeft', 0), sr = sn(st, 'spacingRight', 0), stp = sn(st, 'spacingTop', 0), sbm = sn(st, 'spacingBottom', 0);
-  return { x: x + sp + sl, y: y + sp + stp, w: Math.max(1, w - 2 * sp - sl - sr), h: Math.max(1, h - 2 * sp - stp - sbm) };
+  const ic = labelIconSlot(c);
+  return { x: x + sp + sl + ic, y: y + sp + stp, w: Math.max(1, w - 2 * sp - sl - sr - ic), h: Math.max(1, h - 2 * sp - stp - sbm) };
+}
+/* ---------- icon before the label (deIcon), marker (deMarker), shadow, double outline, dot matrix ---------- */
+const LABEL_ICON = 22, LABEL_ICON_GAP = 8;
+const ICON_NAME = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+function labelIcon(c) { const n = c.style.deIcon; return n && ICON_NAME.test(n) && !c.e && !c.isEdgeLabel && shapeKind(c) !== 'icon' && labelInside(c) ? n : null; }
+function labelIconSlot(c) { return labelIcon(c) ? LABEL_ICON + LABEL_ICON_GAP : 0; }
+function glyphPaths(name, size, x, y) {
+  const ls = PH.ready ? phLayers(name, 'regular') : null;
+  if (!ls) return [];
+  const s = size / 256;
+  return ls.map(l => pathAbsToD(l.cmds, s, x, y));
+}
+// The icon sits just before the text block, centred on it (top-aligned labels: level with the first line).
+function drawLabelIcon(c, g) {
+  const name = labelIcon(c); if (!name) return;
+  const st = c.style, b = labelBox(c), html = labelHtml(c) || '';
+  const lines = html ? layoutRich(html, st, b.w, sv(st, 'whiteSpace', '') === 'wrap') : [];
+  const W = Math.max(0, ...lines.map(l => l.w)), H = lines.reduce((a, l) => a + l.h, 0);
+  const al = sv(st, 'align', 'center'), va = sv(st, 'verticalAlign', 'middle');
+  const left = al === 'left' ? b.x : al === 'right' ? b.x + b.w - W : b.x + (b.w - W) / 2;
+  const top = va === 'top' ? b.y : va === 'bottom' ? b.y + b.h - H : b.y + (b.h - H) / 2;
+  const iy = va === 'top' && lines.length ? top + (lines[0].h - LABEL_ICON) / 2 : top + (H - LABEL_ICON) / 2;
+  const col = colorOr(st, 'fontColor', '#1e293b');
+  for (const d of glyphPaths(name, LABEL_ICON, left - LABEL_ICON - LABEL_ICON_GAP, iy)) el('path', { d, fill: col, stroke: 'none', class: 'deIcon' }, g);
+}
+// Marker: 28 px disc centred on the top-right corner, 18 px icon; Alert and Critical solid with a white icon.
+function drawMarker(c, g) {
+  const s = bpSemantic(c.style.deMarker); if (!s || c.e || c.isEdgeLabel) return;
+  const cx = c.x + c.w, cy = c.y, solid = !!s.solid;
+  el('circle', { cx, cy, r: 14 - 0.75, fill: solid ? s.ink : (s.pin || s.fill), stroke: s.line || s.ink, 'stroke-width': 1.5, 'stroke-dasharray': s.dashed ? '3 2' : null, class: 'deMarker' }, g);
+  for (const d of glyphPaths(s.icon, 18, cx - 9, cy - 9)) el('path', { d, fill: solid ? '#ffffff' : s.ink, stroke: 'none' }, g);
+}
+let DOTS_SEQ = 0;
+function dotsFill(c, g) {
+  const st = c.style, gap = 20, col = safeColour(st.deDotsColor) && hexRgb(st.deDotsColor) ? st.deDotsColor : BP.dots;
+  const id = 'deDots' + (++DOTS_SEQ);
+  const pat = el('pattern', { id, width: gap, height: gap, x: c.x, y: c.y, patternUnits: 'userSpaceOnUse' }, el('defs', {}, g));
+  el('circle', { cx: gap / 2, cy: gap / 2, r: 1.2, fill: col }, pat);
+  return 'url(#' + id + ')';
 }
 function textCss(st) {
   const fs = sn(st, 'fontStyle', 0);
@@ -182,8 +225,22 @@ function renderVertex(c, opts) {
   const sketch = sb(st, 'sketch', false) && rs();
   const fop = sn(st, 'fillOpacity', 100) / 100;
   const lg = g; let g2 = g;
+  const paths = shapePaths(c);
+  const shadow = shadowOf(st);
+  if (shadow && k !== 'text' && paths.length) {
+    // offset in screen space, so the shadow stays down-right on a rotated shape
+    const o = rot({ x: shadow.dx, y: shadow.dy }, { x: 0, y: 0 }, -r);
+    const sg = el('g', { opacity: shadow.opacity / 100, transform: `translate(${o.x},${o.y})`, class: 'deShadow' }, g);
+    for (const p of paths) {
+      if (p.pending) continue;
+      const filled = p.glyph || (p.fill && fill !== 'none');
+      el('path', { d: p.d, fill: filled ? shadow.color : 'none', stroke: p.glyph || stroke === 'none' ? 'none' : shadow.color, 'stroke-width': sw, 'stroke-linejoin': 'round' }, sg);
+    }
+  }
+  const dbl = sb(st, 'deDouble', false) && stroke !== 'none' && sw > 0;
+  let dotted = null;
   if (sb(st, 'deGlow', false) && glowable(c)) g2 = el('g', { filter: st.deGlow === '2' ? 'url(#deGlowSoft)' : 'url(#deGlow)' }, g);
-  for (const p of shapePaths(c)) {
+  for (const p of paths) {
     const g = g2;
     if (p.pending) { el('path', { d: p.d, fill: 'none', stroke: '#cbd5e1', 'stroke-dasharray': '3 3' }, g); continue; }
     if (p.glyph) {
@@ -197,7 +254,7 @@ function renderVertex(c, opts) {
       else el('path', { d: p.d, fill: gf, stroke: 'none', opacity: p.alpha < 1 ? p.alpha : null }, g);
       continue;
     }
-    const f = p.fill ? fill : 'none';
+    const f = p.wedge ? (stroke === 'none' ? '#000000' : stroke) : p.fill ? fill : 'none';
     if (p.noStroke) { if (f !== 'none') el('path', { d: p.d, fill: f, stroke: 'none' }, g); continue; }
     if (sketch) {
       const fs = sv(st, 'fillStyle', 'solid'), rough = clamp(sn(st, 'jiggle', 1.5) * 0.66, 0.3, 2.2);
@@ -207,12 +264,17 @@ function renderVertex(c, opts) {
     } else {
       el('path', { d: p.d, fill: f, 'fill-opacity': f !== 'none' && fop < 1 ? fop : null, stroke: stroke, 'stroke-width': sw, 'stroke-dasharray': dash, 'stroke-linejoin': 'round' }, g);
     }
+    if (st.deDots !== undefined && p.fill && !p.wedge) { dotted = dotted || dotsFill(c, g); el('path', { d: p.d, fill: dotted, stroke: 'none', class: 'deDots' }, g); }
+    // double outline: the full width in the outline colour, then its middle third in the fill colour (two lines and a gap)
+    if (dbl && p.fill && !p.wedge && !sketch) el('path', { d: p.d, fill: 'none', stroke: f !== 'none' ? f : '#ffffff', 'stroke-width': sw / 3, 'stroke-linejoin': 'round', class: 'deDouble' }, g);
     if (p.unknown) el('text', { x: c.x + 4, y: c.y + 12, 'font-size': 10, fill: '#94a3b8' }, g).textContent = 'shape: ' + (st.shape || '?').slice(0, 24);
   }
   if (!opts.noLabel) {
+    drawLabelIcon(c, lg);
     if (opts.exportText) exportLabel(c, lg);
     else vertexLabelFO(c, lg);
   }
+  drawMarker(c, lg);
   return lg;
 }
 

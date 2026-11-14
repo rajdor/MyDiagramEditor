@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.1.0 (14 November 2026)
+
+### Features
+- Blueprint diagram style, from the Fine Line Blueprint style guide: navy ink, pale fills, crisp offset shadows, Architects Daughter; one Undo step, warnings and contrast checks like the other styles. Rules: docs/STYLES.md (permutations 21 to 30)
+- Blueprint states for shapes (Focus, External, Note, Good, Bad, Warning, Alert, Critical, New, Changed, Retire, Comment, Neutral) with the state icon before the label; markers on the top-right corner; line types (Existing, Planned, Async, Retire, Annotation, Association)
+- Drop shadow on any shape, in any style: crisp offset with colour, opacity, size and direction
+- New shapes: Callout panel, Question, Annotation (with its dashed arrow) and Checklist (click to tick, Enter adds an item) under Notes; Harvey balls (0 to 100%); Backgrounds, Dot matrix (dots stay 20 px apart when resized)
+- Gliffy compatible export: Harvey balls embedded as images; Blueprint extras Gliffy cannot show are listed in the report
+- Embed mode: inside an iframe, after a `de:init` message from its parent, the editor shows Done and Cancel instead of the file commands and returns draw.io XML plus an SVG with unique ids, no embedded fonts and accessibility attributes (docs/EMBED.md). Standalone use is unchanged
+
+### Documentation
+- docs/STYLES.md lists every editor-only key (the agreed exceptions to "the file stays plain draw.io"), and asks for agreement before adding new ones
+
+### Tests
+- t43: embed mode with a stand-in host page: ready, init, dirty, Done (XML round trip, prefixed ids, no fonts, accessibility), Cancel, blocked file commands, no autosave, messages from other sources ignored
+- t42: Blueprint tokens, every state and line type, switching in and out (round trip), contrast, exports (dots, shadows, double outline, markers, icons, no blur), draw.io round trip, dot spacing, hostile values, checklist clicks and Enter
+
 ## 1.0.0 (24 October 2026)
 
 First release with a full test suite.

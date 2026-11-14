@@ -1,6 +1,6 @@
 # Tests
 
-Version 1.0.0: 41 test files. Run them all from the repository root:
+Version 1.1.0: 43 test files. Run them all from the repository root:
 
 ```
 npm test                          # every test, about 5 minutes; summary in the console, details in test/out/results.txt
@@ -62,5 +62,7 @@ Only checks that do not depend on installed fonts are in baselines, so they pass
 | t39 | **Presets**: 8 filled, 8 outline, Subtle and Bold; a filled preset fills a no-fill shape in Sketch (fill style None); open containers stay unfilled; highlight follows clicks; one undo step each |
 | t40 | **Agreed editing behaviour**: select all and selection box skip hidden layers, send to back inside containers, pasting a line label alone, delete keeps lines, cut and lock, duplicate and the clipboard, 1 px arrow nudges, containers (drop in, move together, drag out, palette drop, save), grouping, Escape cancels, grid size |
 | t41 | **Contrast**: WCAG 2.2 maths and large text; 1,600 random colour combinations on 9 canvases pass after correction; OKLCH hue kept (under 2 degrees); fills never changed; smallest step; style and canvas switches; your own colours left until a bulk action; Fix text colours; the setting; unfixable fills flagged; report; save and reopen; no network |
+| t42 | **Blueprint**: tokens by role, all 13 states and 6 line types (dash lengths in pixels), switches to and from every style with one Undo step, Outline to Blueprint to Outline to Blueprint round trip, contrast, SVG export (dots, crisp shadows, double outline, markers, icons, no blur), Harvey ball stencils and draw.io round trip, fixed dot spacing, hostile style values, checklist ticking and Enter |
+| t43 | **Embed mode**: the editor in an iframe of `test/embed-host.html`: de:ready, normal until de:init, other senders ignored, Done and Cancel instead of file commands, no autosave, de:dirty, de:save (XML reopens identically, every SVG id prefixed and references matching, a new prefix each time, no fonts, role, aria-label and title, text kept as text, dot matrix), Cancel asks when there are changes, a new diagram in the requested style |
 
 Screenshots and exported files from the last run are written to `test/out/` (ignored by git).

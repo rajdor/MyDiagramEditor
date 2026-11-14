@@ -25,6 +25,7 @@ const ICONS = {
   st_duotone: '<rect x="4" y="5" width="16" height="14" rx="3" fill="currentColor" fill-opacity=".3"/>',
   st_sketch: '<path d="M4.5 6.2c4-.6 10.5-.9 15.2-.3M19.6 5.4c.4 4.2.3 9 .1 13.4M20 18.6c-5 .5-10.6.6-15.6.2M4.2 19c-.3-4.4-.2-8.8.4-13.3"/><path d="M7 16l9-9M10 17l7-7M7 12l5-5" stroke-width="1" opacity=".6"/>',
   st_neon: '<rect x="4" y="5" width="16" height="14" rx="3" stroke-width="3.6" opacity=".25"/><rect x="4" y="5" width="16" height="14" rx="3"/>',
+  st_blueprint: '<circle cx="4" cy="4" r=".9" fill="currentColor" stroke="none"/><circle cx="12" cy="4" r=".9" fill="currentColor" stroke="none"/><circle cx="20" cy="4" r=".9" fill="currentColor" stroke="none"/><rect x="4" y="8" width="16" height="11" rx="1.5"/><path d="M6 21h15V10" opacity=".35"/>',
   chev: '<path d="M7 10l5 5 5-5"/>',
   save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/>',
   open: '<path d="M3 7h6l2 2h10v10H3z"/>',
@@ -70,7 +71,7 @@ const COMMANDS = {
   toggleSmart: () => mutate(() => { page().smartGuides = !page().smartGuides; }),
   toggleSketch: () => setDiagramStyle(S.doc.mode === 'sketch' ? 'outline' : 'sketch'),
   styleOutline: () => setDiagramStyle('outline'), styleFilled: () => setDiagramStyle('filled'), styleDuotone: () => setDiagramStyle('duotone'),
-  styleSketch: () => setDiagramStyle('sketch'), styleNeon: () => setDiagramStyle('neon'), styleMenu: () => styleMenu(),
+  styleSketch: () => setDiagramStyle('sketch'), styleNeon: () => setDiagramStyle('neon'), styleBlueprint: () => setDiagramStyle('blueprint'), styleMenu: () => styleMenu(),
   hopsAll: () => mutate(() => { const on = !page().cells.some(c => c.e && sv(c.style, 'jumpStyle', 'none') !== 'none'); for (const c of page().cells) if (c.e) { c.style.jumpStyle = on ? 'arc' : 'none'; if (on) c.style.jumpSize = '8'; } toast(on ? 'Line hops on for all lines' : 'Line hops off for all lines'); }),
   alignL: () => alignSel('left'), alignC: () => alignSel('center'), alignR: () => alignSel('right'),
   alignT: () => alignSel('top'), alignM: () => alignSel('middle'), alignB: () => alignSel('bottom'),
@@ -85,14 +86,20 @@ const COMMANDS = {
   restoreAutosave: () => checkAutosave(true),
   fixText: () => manualContrast('text'), fixContrast: () => manualContrast('all'), contrast: () => contrastDialog()
 };
-function runCommand(id) { if (S.editing && !['undo', 'redo'].includes(id)) finishEdit(); const f = COMMANDS[id]; if (f) f(); }
+function runCommand(id) {
+  if (S.embed && EMBED_BLOCKED.has(id)) { if (id === 'save') toast('Press Done to return the diagram.'); return; } // the host page owns files in embed mode
+  if (S.editing && !['undo', 'redo'].includes(id)) finishEdit(); const f = COMMANDS[id]; if (f) f();
+}
 
 /* ---------- menus ---------- */
 function menuDefs() {
   const pg = page(), has = S.sel.length > 0, multi = topUnits(selCells()).length > 1;
   const chk = (v) => ({ check: !!v });
   return {
-    File: [
+    File: S.embed ? [
+      { t: 'Done', c: 'embedDone', hint: 'Return the diagram to the document' }, { t: 'Cancel', c: 'embedCancel', hint: 'Close without returning changes' }, '-',
+      { t: 'UI theme', sub: UI_THEMES.map(t => ({ t: t.label, check: (S.prefs.uiTheme || DEFAULT_UI_THEME) === t.id, fn: () => { applyUiTheme(t.id); toast('UI theme: ' + t.label); } })) }
+    ] : [
       { t: 'New', c: 'new' }, { t: 'Open…', c: 'open', sc: 'Ctrl+O' }, { t: 'Open recent', sub: recentMenu() }, '-',
       { t: 'Save', c: 'save', sc: 'Ctrl+S' }, { t: 'Save as…', c: 'saveAs', sc: 'Ctrl+Shift+S' }, '-',
       { t: 'Export draw.io (Gliffy compatible)…', c: 'exportGliffy' }, { t: 'Export PNG…', c: 'exportPng' }, { t: 'Export SVG', c: 'exportSvg' }, { t: 'Export PDF', c: 'exportPdf' }, '-',
@@ -176,7 +183,7 @@ function buildToolbar() {
   const tb = $('#toolbar'); tb.innerHTML = '';
   const B = (ic, title, cmd, extra) => { const b = document.createElement('button'); b.className = 'tb'; b.title = title; b.innerHTML = icon(ic) + (extra || ''); b.onclick = () => runCommand(cmd); b.dataset.cmd = cmd; tb.appendChild(b); return b; };
   const sep = () => { const s = document.createElement('div'); s.className = 'tbsep'; tb.appendChild(s); };
-  B('save', 'Save (Ctrl+S)', 'save'); B('open', 'Open (Ctrl+O)', 'open'); sep();
+  if (!S.embed) { B('save', 'Save (Ctrl+S)', 'save'); B('open', 'Open (Ctrl+O)', 'open'); sep(); }
   B('undo', 'Undo (Ctrl+Z)', 'undo'); B('redo', 'Redo (Ctrl+Y)', 'redo'); B('trash', 'Delete', 'delete'); sep();
   B('zoomOut', 'Zoom out', 'zoomOut');
   const zl = document.createElement('button'); zl.className = 'tb'; zl.id = 'zoomLabel'; zl.title = 'Actual size'; zl.onclick = () => runCommand('zoom100'); tb.appendChild(zl);
@@ -188,7 +195,11 @@ function buildToolbar() {
   B('arrange', 'Auto arrange shapes', 'arrangeShapes');
   const sk = B('st_outline', 'Diagram style', 'styleMenu', '<span class="stName">Outline</span>' + icon('chev').replace('<svg ', '<svg class="chev" ')); sk.id = 'styleBtn'; sep();
   const cb = B('fit', 'Screenshot mode: hide grid, rulers, guides and selection (Ctrl+Shift+E, Esc to leave)', 'toggleClean', '<span>Screenshot</span>'); cb.id = 'cleanBtn'; cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg><span>Screenshot</span>'; sep();
-  B('exportI', 'Export PNG', 'exportPng', '<span>Export</span>');
+  if (!S.embed) B('exportI', 'Export PNG', 'exportPng', '<span>Export</span>');
+  else {
+    const cn = B('undo', 'Close without returning changes', 'embedCancel', '<span>Cancel</span>'); cn.id = 'embedCancel'; cn.innerHTML = '<span>Cancel</span>';
+    const dn = B('save', 'Return the diagram to the document', 'embedDone', '<span>Done</span>'); dn.id = 'embedDone'; dn.classList.add('primary');
+  }
   updateZoomLabel();
 }
 function updateToolbar() {
@@ -273,6 +284,12 @@ function styleDialog(mode) {
     row('Fill style', select('fillStyle', SKETCH_FILLS));
     row('Roughness', select('rough', [['subtle', 'Subtle'], ['normal', 'Normal'], ['rough', 'Rough']]));
     chkBox('Override font (handwriting)', 'font');
+  } else if (mode === 'blueprint') {
+    sect('Blueprint');
+    chkBox('Apply guide text sizes (box labels 22 px bold, line labels 17 px)', 'sizes');
+    chkBox('Shadows (crisp navy offset, no blur)', 'shadows');
+    const h = document.createElement('div'); h.className = 'hint sdhint'; h.textContent = 'One navy ink: colour coding is replaced. Add colour back with Blueprint states (Format panel). For the dotted page, use Backgrounds, Dot matrix in the palette.'; d.appendChild(h);
+    if (!S.doc.pages.every(p => pageBackground(p).toLowerCase() === '#ffffff')) { sect('Canvas'); chkBox('Switch the canvas to white', 'whiteCanvas'); }
   } else if (mode === 'neon') {
     sect('Canvas');
     o.darkCanvas = o.darkCanvas !== false && !S.doc.pages.every(p => isDarkBg(pageBackground(p)));
@@ -427,6 +444,10 @@ function paletteIcon(d) {
   const c = makeVertex(d.key, 0, 0, S.doc.mode);
   const s = Math.min(40 / c.w, 30 / c.h); c.w *= s; c.h *= s; c.x = (46 - c.w) / 2; c.y = (38 - c.h) / 2;
   if (d.key === 'text') { svg.innerHTML = '<text x="23" y="24" text-anchor="middle" font-size="15" font-family="Georgia, serif" fill="#334155">Aa</text>'; return svg; }
+  if (d.key === 'question') { svg.innerHTML = '<text x="23" y="25" text-anchor="middle" font-size="15" font-family="Georgia, serif" fill="#B23C0B">\u2192 ?</text>'; return svg; }
+  if (d.key === 'annotation') { svg.innerHTML = '<text x="4" y="15" font-size="11" font-family="Georgia, serif" fill="#B23C0B">note</text><path d="M14 19 L36 31" stroke="#B23C0B" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/><path d="M37 32 l-6 -1 3 -4z" fill="#B23C0B"/>'; return svg; }
+  if (d.key === 'checklist') { svg.innerHTML = '<text x="6" y="16" font-size="12" fill="#334155">\u2611 \u2014</text><text x="6" y="31" font-size="12" fill="#334155">\u2610 \u2014</text>'; return svg; }
+  if (d.key === 'dots') { let h = '<rect x="3" y="4" width="40" height="30" rx="2" fill="#ffffff" stroke="#cbd5e1"/>'; for (let i = 0; i < 5; i++) for (let j = 0; j < 4; j++) h += '<circle cx="' + (7 + i * 8) + '" cy="' + (8 + j * 7.5) + '" r="1.1" fill="#9fb3c8"/>'; svg.innerHTML = h; return svg; }
   c.style.strokeWidth = '1.2';
   svg.appendChild(renderVertex(c, { noLabel: true }));
   return svg;
@@ -455,9 +476,19 @@ function insertShape(d, at) {
     const c = d.icon ? makeIconVertex(d.icon, 0, 0, S.doc.mode) : makeVertex(d.key, 0, 0, S.doc.mode);
     const p = snapPoint({ x: at.x - c.w / 2, y: at.y - c.h / 2 }); c.x = p.x; c.y = p.y;
     c.parent = page().layers[0].id;
-    page().cells.push(c); S.sel = [c.id];
-    if (at.dropped) { refreshMap(); reparentToContainers([c]); }
+    if (d.back) page().cells.unshift(c); else page().cells.push(c);
+    S.sel = [c.id];
+    if (d.withLine) { const e = makeAnnotationLine(c); page().cells.push(e); }
+    if (at.dropped && !d.back) { refreshMap(); reparentToContainers([c]); }
   });
+}
+// An annotation's dashed red arrow starts at the note and points down-right, ready to be dragged onto its subject.
+function makeAnnotationLine(note) {
+  const e = makeEdge('outline'); e.style = parseStyle(ANNOTATION_EDGE_STYLE); e.parent = note.parent;
+  e.source = note.id; e.style.exitX = '1'; e.style.exitY = '0.5';
+  e.tp = { x: note.x + note.w + 80, y: note.y + note.h / 2 + 50 };
+  if (S.doc.mode && S.doc.mode !== 'outline') styleNewCell(e, S.doc.mode);
+  return e;
 }
 function addFreeLine(at) {
   const r = vpRect(); at = at || { x: (r.width / 2 - S.tx) / S.zoom, y: (r.height / 2 - S.ty) / S.zoom };
@@ -704,7 +735,9 @@ function buildFormat() {
   const targets = styleTargets();
   const verts = targets.filter(c => !c.e && !c.isEdgeLabel), edges = targets.filter(c => c.e), labels = targets.filter(c => c.isEdgeLabel);
   const first = cs[0];
+  if (S.doc.mode === 'blueprint') formatBlueprint(verts, edges);
   if (verts.length) formatShapeStyle(verts);
+  if (verts.some(c => shapeKind(c) !== 'text')) formatShadow(verts);
   if (edges.length) formatLine(edges);
   if (verts.length || labels.length || S.editing) formatText(verts.concat(labels), edges);
   if (cs.length === 1 && !first.e && !first.isEdgeLabel) formatGeometry(first);
@@ -800,6 +833,45 @@ function formatShapeStyle(verts) {
   if (shapeKind(c) === 'callout') {
     const r4 = frow(s, 'Pointer');
     r4.appendChild(mkSel([{ v: '0.1', label: 'Left' }, { v: '0.5', label: 'Centre' }, { v: '0.9', label: 'Right' }], String(clamp(Math.round(sn(st, 'position2', 0.5) * 10) / 10, 0.1, 0.9) > 0.6 ? '0.9' : sn(st, 'position2', 0.5) < 0.35 ? '0.1' : '0.5'), (v) => applyStyle(cl => { const p2 = +v; cl.style.position2 = String(p2); cl.style.position = String(clamp(p2 < 0.5 ? p2 + 0.1 : p2 > 0.5 ? p2 - 0.25 : 0.4, 0, 0.9)); }, cl => shapeKind(cl) === 'callout')));
+  }
+}
+// Drop shadow, any shape, any style: crisp offset (no blur) with colour, opacity, size and direction.
+function shadowDefault() { return Object.assign({}, S.doc.mode === 'blueprint' ? BP.shadow : SHADOW_DEFAULT); }
+const SHADOW_DIRS = [['se', 'Down right', 1, 1], ['s', 'Down', 0, 1], ['sw', 'Down left', -1, 1], ['w', 'Left', -1, 0], ['nw', 'Up left', -1, -1], ['n', 'Up', 0, -1], ['ne', 'Up right', 1, -1], ['e', 'Right', 1, 0]];
+function formatShadow(verts) {
+  const st = verts.find(c => shapeKind(c) !== 'text').style, cur = shadowOf(st);
+  const s = fsec('Drop shadow');
+  const on = (cl) => shapeKind(cl) !== 'text';
+  const get = () => shadowOf(st) || shadowDefault();
+  const set = (fn) => applyStyle(cl => { const v = shadowOf(cl.style) || shadowDefault(); fn(v); setShadow(cl.style, v); }, on);
+  frow(s).appendChild(mkChk('Shadow', !!cur, (v) => applyStyle(cl => setShadow(cl.style, v ? (shadowOf(cl.style) || shadowDefault()) : null), on)));
+  if (!cur) return;
+  const r1 = frow(s, 'Colour');
+  r1.appendChild(mkColor(cur.color, (v, live) => { if (!live) set(x => { x.color = v; }); }));
+  const op = mkNum(cur.opacity, (v) => set(x => { x.opacity = clamp(Math.round(v), 0, 100); }), 5, 0); op.title = 'Opacity (%)'; r1.appendChild(op);
+  const size = Math.max(Math.abs(cur.dx), Math.abs(cur.dy));
+  const dir = SHADOW_DIRS.find(d => d[2] === Math.sign(cur.dx) && d[3] === Math.sign(cur.dy)) || SHADOW_DIRS[0];
+  const r2 = frow(s, 'Size');
+  r2.appendChild(mkNum(size, (v) => set(x => { const n = clamp(v, 0, 50), d = SHADOW_DIRS.find(q => q[2] === Math.sign(x.dx) && q[3] === Math.sign(x.dy)) || SHADOW_DIRS[0]; x.dx = d[2] * n; x.dy = d[3] * n; }), 1, 0));
+  const r3 = frow(s, 'Direction');
+  r3.appendChild(mkSel(SHADOW_DIRS.map(d => ({ v: d[0], label: d[1] })), dir[0], (v) => set(x => { const d = SHADOW_DIRS.find(q => q[0] === v), n = Math.max(Math.abs(x.dx), Math.abs(x.dy)) || get().dx; x.dx = d[2] * n; x.dy = d[3] * n; })));
+}
+// Blueprint: states and markers on shapes, line types on lines (only while the diagram is in Blueprint).
+function formatBlueprint(verts, edges) {
+  const shapes = verts.filter(c => styleRole(c) === 'shape'), lines = edges.filter(c => !c.style.deNote);
+  if (!shapes.length && !lines.length) return;
+  const s = fsec('Blueprint');
+  const o = styleOpts('blueprint');
+  if (shapes.length) {
+    const st = shapes[0].style;
+    const opts = [{ v: '', label: 'None' }].concat(Object.keys(BP_EMPHASIS).map(k => ({ v: k, label: BP_EMPHASIS[k].label })), Object.keys(BP_STATES).map(k => ({ v: k, label: BP_STATES[k].label })));
+    frow(s, 'State').appendChild(mkSel(opts, bpState(st.deState) ? st.deState : '', (v) => applyStyle(cl => { bpApplyState(cl, v, Object.assign({}, o, { shadows: o.shadows || !!shadowOf(cl.style) })); cl.style.deMode = 'blueprint'; }, cl => styleRole(cl) === 'shape')));
+    frow(s, 'Marker').appendChild(mkSel([{ v: '', label: 'None' }].concat(Object.keys(BP_STATES).map(k => ({ v: k, label: BP_STATES[k].label }))), bpSemantic(st.deMarker) ? st.deMarker : '', (v) => applyStyle(cl => setStyle(cl.style, 'deMarker', v || null), cl => styleRole(cl) === 'shape')));
+    const h = document.createElement('p'); h.className = 'hint'; h.textContent = 'A state sets the colours, outline and icon. A marker is an extra icon disc on the top-right corner, for example an Alert marker on the Focus box.'; s.appendChild(h);
+  }
+  if (lines.length) {
+    const cur = lines[0].style.deLine || (sv(lines[0].style, 'endArrow', 'classic') === 'none' ? 'association' : 'existing');
+    frow(s, 'Line').appendChild(mkSel(BP_LINES.map(l => ({ v: l.id, label: l.label })), BP_LINES.some(l => l.id === cur) ? cur : 'existing', (v) => applyStyle(cl => { bpSetLine(cl, v); cl.style.deMode = 'blueprint'; }, cl => cl.e && !cl.style.deNote)));
   }
 }
 function formatText(cells, edges) {

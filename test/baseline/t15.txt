@@ -1,5 +1,5 @@
 [ 'Compressed page:7 layers 2', 'Plain page:7 layers 2' ]
-<mxfile host="Diagram Editor" agent="Diagram Editor 1.0.0" version="24.0.0" type="device">
+<mxfile host="Diagram Editor" agent="Diagram Editor 1.1.0" version="24.0.0" type="device">
 <diagram name="Compressed page" id="d1">
 <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
 <root>

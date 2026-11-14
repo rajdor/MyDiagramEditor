@@ -1,6 +1,6 @@
 # Diagram styles
 
-Agreed 24 October 2026. This is the reference for how the five diagram styles behave and why.
+Agreed 24 October 2026; Blueprint added 14 November 2026. This is the reference for how the six diagram styles behave and why.
 
 ## Styles
 
@@ -11,12 +11,13 @@ Agreed 24 October 2026. This is the reference for how the five diagram styles be
 | Duotone | Two harmonising colours: strong outline, soft tinted fill | Identical, except two-colour icons show in one colour |
 | Sketch | Hand-drawn whiteboard (Rough.js), handwriting font | Identical (draw.io's own sketch keys) |
 | Neon | Glowing lines, best on a dark canvas | No glow; bright outlines only |
+| Blueprint | Navy ink, pale fills, crisp offset shadows, handwriting font, with status colours (Fine Line Blueprint) | Colours, outline widths and dashes identical; no shadows, double outlines, icons before labels or markers (see [Editor-only keys](#editor-only-keys)) |
 
 A style applies to the whole diagram, every page. New shapes, lines and icons take the current style.
 
 ## Principles
 
-1. **No hidden extra state.** A style switch is a one-way recolour, like find and replace. The file stays plain draw.io.
+1. **No hidden extra state.** A style switch is a one-way recolour, like find and replace. The file stays plain draw.io. The agreed exceptions are listed under [Editor-only keys](#editor-only-keys).
 2. **Warn, then rely on Undo.** Every switch shows a warning first and can be cancelled. The whole switch is one Undo step (Ctrl+Z). The undo history holds 120 steps and is cleared when the file is closed.
 3. **Contrast is always checked.** After every style or canvas switch, the whole diagram is tested against WCAG 2.2 and failing text, outline, line and icon colours are corrected (see Contrast below). Colours you set by hand are left as they are until the next switch or until you press a Fix button.
 
@@ -52,6 +53,33 @@ Not checked: grid, guides, selection handles, and colours inside rich text.
 **Report.** Style, Contrast report: what fails now, and every correction of the last pass (element, old and new colour, target, background tested against, ratio before and after), with an APCA Lc reading for information only (APCA is not a standard). Anything that could not be fixed is flagged.
 
 **Files.** Corrected colours are ordinary draw.io keys (fontColor, strokeColor; fillColor for icons), so draw.io and Gliffy show the same result.
+
+## Editor-only keys
+
+Principle 1 says the file stays plain draw.io. These keys are the agreed exceptions: extra style keys or page attributes that only this editor reads. draw.io ignores unknown keys, so a file still opens there. Wherever a key changes the look, the editor also writes the closest standard draw.io keys (colours, `strokeWidth`, `dashed`, or a generated stencil), so the diagram is still recognisable in draw.io.
+
+| Key | On | Meaning | What draw.io shows | Since |
+|---|---|---|---|---|
+| `deMode` | cell | Which diagram style the cell was converted to (`filled`, `duotone`, `neon`, `blueprint`); absent for Outline | The colours as converted | 1.0.0 |
+| `deCont` | cell | Marks a shape recognised as a container, so it stays one after it gets a tint | The shape | 1.0.0 |
+| `deGlow` | cell | Neon glow (`1` dark canvas, `2` light canvas) | No glow; bright outline only | 1.0.0 |
+| `dePh`, `deW` | cell | Phosphor icon name and weight; the stencil is regenerated on save | The icon, from the stencil | 1.0.0 |
+| `deC2` | cell | Second colour of a duotone icon | Icon in one colour | 1.0.0 |
+| `deGridVisible`, `deGuides`, `deGuidesLocked`, `deGuidesVisible`, `deRulers` | page or diagram | Grid visibility, guides and rulers | Nothing (editor settings) | 1.0.0 |
+| `deState` | cell | Blueprint state: `focus`, `external`, or one of the 11 semantic states | The state's colours, outline width and dash | 1.1.0 |
+| `deIcon` | cell | Phosphor icon drawn before the label (state icons, callout panel) | Label without the icon | 1.1.0 |
+| `deMarker` | cell | Blueprint marker: a state icon in a disc on the top-right corner | Nothing | 1.1.0 |
+| `deLine` | edge | Blueprint line type: `planned`, `async`, `retire`, `annotation`, `association` | The colour, dash and arrowhead | 1.1.0 |
+| `deDouble` | cell | Double outline (Blueprint Critical) | A single outline of the same total width | 1.1.0 |
+| `deShadow`, `deShadowColor`, `deShadowOpacity`, `deShadowDx`, `deShadowDy` | cell | Crisp offset shadow, no blur (draw.io's own `shadow=1` is blurred, so it is not used) | No shadow | 1.1.0 |
+| `deDots`, `deDotsColor` | cell | Dot matrix background shape: fixed 20 px dot spacing, whatever the shape's size | The shape's plain fill | 1.1.0 |
+| `deHarvey` | cell | Harvey ball fill (0, 25, 50, 75 or 100%); the stencil is regenerated on save | The ball, from the stencil | 1.1.0 |
+| `deChecklist` | cell | Checklist text box: click a ☐ or ☑ to tick it, Enter adds an item | The text with ☐ and ☑ characters | 1.1.0 |
+| `deNote` | cell | Notes shapes that keep their redline look in Blueprint (`question`, `annotation`) | The text in its colours | 1.1.0 |
+
+Every key here is validated when a file is opened, like any other style value (docs/SECURITY.md): colours must be real colours, numbers are limited, and names must be known values.
+
+**Reminder for future changes:** before adding a new editor-only key or page attribute, check this table and **ask first**. Say what the key stores, why standard draw.io keys are not enough, and what draw.io will show without it. Add the key to this table in the same change, with the version.
 
 ## Terms
 
@@ -123,6 +151,67 @@ Options: **Also switch the canvas to dark navy?** (default Yes when the canvas i
 | Lines | Bright colour, at least 2 px, glowing |
 | Icons | Outline weight, bright colour, glowing |
 
+### 21. Outline to Blueprint
+
+Blueprint is based on the Fine Line Blueprint style guide. The tables below are its definitions as built; the code defines them once, in `src/blueprint.js` (`BP`, `BP_STATES`, `BP_EMPHASIS`, `BP_LINES`). Change both together.
+
+| Token | Value | Use |
+|---|---|---|
+| Ink | `#12355B` | Outlines, lines, box text, icons |
+| Soft ink | `#3D5A7A` | Container outlines and names, line labels |
+| Redline | `#B23C0B` | The focus element's text, annotations, questions |
+| Fill | `#EAF1F8` | Default box fill |
+| Red fill | `#FDF1EA` | Focus box fill |
+| Paper | `#FFFFFF` | Page, External boxes, Harvey ball rings, dot matrix sheet |
+| Dots | `#CFDBE8` | Dot matrix: 1.2 px dots every 20 px |
+| Shadow | Ink at 20%, 2 px right, 3 px down, no blur | Shapes (not containers, lines, text, icons or Retire) |
+| Font | Architects Daughter (embedded) | All Blueprint text |
+| Sizes | Box label 22 px bold; line and container label 17 px; question and annotation 21 px | With "Apply guide text sizes" |
+| Shape | Outline 1.5 px, corner radius 3 px; lines 2.5 px with round caps and joins | |
+
+| State | Ink (outline, text, icon) | Fill | Outline | Icon (Phosphor Regular) |
+|---|---|---|---|---|
+| Focus | `#B23C0B` text, `#12355B` outline | `#FDF1EA` | 1.5 px | none |
+| External | `#12355B` | `#FFFFFF` | 1.5 px dashed | none |
+| Note | `#1F5FA8` | `#E6F0FB` | 1.5 px | info |
+| Good | `#1E6B45` | `#E3F4EA` | 1.5 px | check-circle |
+| Bad | `#A1162B` | `#FBE4E7` | 1.5 px | x-circle |
+| Warning | `#8A5300` | `#FFF1D1` | 1.5 px | warning |
+| Alert | `#B54708` | `#FEEBDD` | 2.5 px; solid marker | bell-ringing |
+| Critical | `#8E1027` | `#FBE4E7` | 4 px double; solid marker | warning-octagon |
+| New | `#1E6B45` | `#E3F4EA` | 1.5 px | plus-circle |
+| Changed | `#8A5300` | `#FFF1D1` | 1.5 px | pencil-simple |
+| Retire | `#5F6B7A` | `#F1F3F5` | 1.5 px dashed, no shadow | archive |
+| Comment | `#3A3A3A` text, `#D9C66A` outline | `#FFFDF0` | 1.5 px, 12 px corners; marker disc `#FFF6C2` | chat-circle-text |
+| Neutral | `#5F6B7A` | `#F1F3F5` | 1.5 px | minus-circle |
+
+Meaning: Note is worth knowing (no action); Good and Bad judge against a stated target; Warning is a risk to watch; Alert needs action soon; Critical is blocking (the severity ladder is Note, Warning, Alert, Critical); New, Changed and Retire are lifecycle from current to target state; Comment is a reviewer remark to remove before publishing; Neutral is out of scope or undecided. Every semantic state shows its icon as well as its colour, so it survives greyscale printing.
+
+
+Options: **Apply guide text sizes** (default Yes); **Shadows** (default Yes); **Switch the canvas to white** (shown only when a page is not white; default Yes).
+
+Blueprint has one ink. Existing colour coding is replaced; colour comes back only through states.
+
+| Item | Result |
+|---|---|
+| Shapes | Fill `#EAF1F8`, outline navy `#12355B` 1.5 px, corner radius 3 px (rectangles; pills such as terminators keep their rounding), Architects Daughter, navy, bold, 22 px with sizes on. Shadow 2 px right, 3 px down, navy at 20%, no blur, with shadows on |
+| Containers | No fill, dashed soft-ink outline `#3D5A7A`, label soft ink 17 px top left, no shadow |
+| Lines | Navy 2.5 px, round caps and joins, filled triangle head. Straight lines without waypoints become elbows; curved and waypoint routes are kept. Crow's foot ends are kept, and a start arrow stays a (filled) start arrow |
+| Line labels | Soft ink, 17 px, no background, moved 8 px clear of the line (above a horizontal line, right of a vertical one) unless you already moved them |
+| Text | Architects Daughter, navy; size kept, but never below 17 px with sizes on |
+| Icons | Phosphor Regular, navy |
+| Harvey balls | Navy outline and wedge, white ring |
+| Question, annotation | Keep their redline look (21 px) |
+| Dot matrix backgrounds | Unchanged (in every style) |
+
+**States** (Format panel, Blueprint, State; shapes only): None, Focus, External, then Note, Good, Bad, Warning, Alert, Critical, New, Changed, Retire, Comment and Neutral. A state sets the fill, outline, text colour and outline treatment from the guide; every semantic state also puts its Phosphor icon before the label, so it survives greyscale printing. Alert has a 2.5 px outline, Critical a 4 px double outline, Retire and External dashed outlines (Retire has no shadow). Focus is red text on a pale red fill with a navy outline, and carries no icon. None restores the plain Blueprint shape. There is no limit on Focus shapes.
+
+**Markers** (Format panel, Blueprint, Marker): an extra 28 px disc with an 18 px state icon on the shape's top-right corner, for example an Alert marker on the Focus box. Alert and Critical markers are solid with a white icon. Markers move, resize and delete with their shape.
+
+**Line types** (Format panel, Blueprint, Line): Existing (solid), Planned (dashed 8 6), Async (dotted 1 6), Retire (grey, dashed 8 6), Annotation (redline, dashed 6 6), Association (no head). Lengths are pixels at 2.5 px; they are stored divided by 2.5 because draw.io multiplies `dashPattern` by the line width.
+
+**Contrast.** Every state's ink on its fill is at least 4.5:1. Shapes with a Blueprint state are not recoloured by the contrast pass (they are the guide's tested pairs), and count as passing.
+
 ## Back to Outline
 
 ### 5. Filled to Outline
@@ -139,7 +228,13 @@ Options: **Override existing fills?** (default Yes); **Fill style:** None, Auto 
 
 Loss: the exact colours from before Filled do not come back.
 
-## Everything else (6 to 20)
+### 22. Blueprint to Outline
+
+Removes what only Blueprint adds: states and their icons, markers, double outlines, line types, and the Blueprint shadow (a shadow you set yourself with other settings is kept). Lines go back to 1.5 px with ordinary arrowheads, line labels get their white background back (they stay where they were moved), and the handwriting font is removed. Shape colours then follow permutation 5: a light tint of the navy outline. Loss: font sizes and bold labels stay as Blueprint set them.
+
+## Everything else (6 to 20, 23 to 30)
+
+Blueprint follows the same pattern: switching from another style to Blueprint (23 to 26) first converts to Outline silently, then applies 21; switching from Blueprint to Filled, Duotone, Sketch or Neon (27 to 30) first applies 22, then the target's rules. One warning, one Undo step.
 
 **Pattern:** switching from style X to style Y (Y not Outline) first converts X to Outline with permutation 5's defaults, silently, then applies Y's rules and options. One warning, one Undo step.
 
@@ -160,6 +255,13 @@ Loss: the exact colours from before Filled do not come back.
 | 18 | Neon to Filled | Pattern plus 17's canvas option |
 | 19 | Neon to Duotone | Pattern plus 17's canvas option |
 | 20 | Neon to Sketch | Keep colours, remove the glow; canvas option default **No** (hand-drawn on dark gives the chalkboard look) |
+
+## Shadows, backgrounds, Harvey balls and notes (any style)
+
+- **Drop shadow** (Format panel, any shape): on or off, colour, opacity, size and direction (eight directions). Always a crisp offset copy of the outline, never blurred, drawn on screen and in SVG, PNG and PDF. Blueprint sets navy at 20%, 2 px right and 3 px down.
+- **Dot matrix** (palette, Backgrounds): a white sheet with 1.2 px dots in `#CFDBE8` every 20 px. Resizing shows more or fewer dots; the spacing never changes. It is inserted at the back and keeps its look in every style.
+- **Harvey balls** (palette, Harvey balls): 0, 25, 50, 75 and 100%, filled clockwise in the outline colour. Saved as a draw.io stencil, so they look the same in draw.io.
+- **Notes** (palette, Notes): Callout panel (icon, bold title, text), Question (red text starting with an arrow), Annotation (red note with a dashed red arrow, drag its end onto the subject), Checklist (click a box to tick it; Enter adds an unticked item; the box grows to fit).
 
 ## Other behaviour
 

@@ -339,12 +339,13 @@ function recentMenu() {
 const AUTOSAVE_KEY = 'de-autosave-v1';
 let autosaveWarned = false;
 function autosaveTick() {
-  if (!S.dirty) return;
+  if (!S.dirty || S.embed) return; // embed mode: the host page keeps the diagram, nothing is stored here
   try { localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({ xml: serializeDoc(S.doc), name: S.file.name, t: Date.now() })); autosaveWarned = false; }
   catch (e) { if (!autosaveWarned) { autosaveWarned = true; toast('Autosave is not working (browser storage is full or blocked). Save your work with Ctrl+S.', 6000); } }
 }
 function clearAutosave() { try { localStorage.removeItem(AUTOSAVE_KEY); } catch (e) { } }
 function checkAutosave(manual) {
+  if (S.embed || EMBED.inFrame) return;
   let a = null; try { a = JSON.parse(localStorage.getItem(AUTOSAVE_KEY) || 'null'); } catch (e) { }
   if (!a) { if (manual) toast('There is no autosaved work to recover.'); return; }
   const when = new Date(a.t).toLocaleString();
@@ -385,8 +386,11 @@ function buildExportSvg(srcPage, opts) {
   svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`); svg.setAttribute('width', w); svg.setAttribute('height', h);
   if (opts.bg !== false) svg.insertBefore(el('rect', { x, y, width: w, height: h, fill: pageBackground(srcPage) }), g);
   if (pg.cells.some(c => sb(c.style, 'deGlow', false))) { const defs = el('defs'); defs.innerHTML = GLOW_FILTER; svg.insertBefore(defs, svg.firstChild); }
-  if (usesSketchFont) { const st = el('style'); st.textContent = "@font-face{font-family:'Architects Daughter';src:url(data:font/woff2;base64," + FONT_B64 + ") format('woff2');}"; svg.insertBefore(st, svg.firstChild); }
-  return { svg: new XMLSerializer().serializeToString(svg), w, h };
+  if (usesSketchFont && opts.fonts !== false) { const st = el('style'); st.textContent = "@font-face{font-family:'Architects Daughter';src:url(data:font/woff2;base64," + FONT_B64 + ") format('woff2');}"; svg.insertBefore(st, svg.firstChild); }
+  if (opts.title !== undefined) { svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', opts.title); const t = el('title'); t.textContent = opts.title; svg.insertBefore(t, svg.firstChild); }
+  let out = new XMLSerializer().serializeToString(svg);
+  if (opts.idPrefix) out = prefixSvgIds(out, opts.idPrefix);
+  return { svg: out, w, h };
 }
 async function renderToCanvas(ex, scale, maxArea) {
   try { await document.fonts.load("16px 'Architects Daughter'"); } catch (e) { }
@@ -497,6 +501,22 @@ const GLIFFY_TRANSFORMS = [
       srep.push({ page: pg.name, item: phLabel(c.style.dePh), change: 'icon to embedded image' });
     }
   } },
+  { id: 'blueprint', name: 'Harvey balls as images (SVG); list Blueprint extras Gliffy cannot show (shadows, double outlines, icons before labels, markers, dot matrix). Colours, dashes and widths are kept', run: (doc, rep, srep) => {
+    for (const pg of doc.pages) for (const c of pg.cells) {
+      const st = c.style, item = htmlToPlain(labelHtml(c) || '').trim().slice(0, 30) || (c.e ? 'line' : shapeKind(c));
+      if (st.deHarvey !== undefined) {
+        const p = harveyOf(st), wd = harveyWedge(0, 0, 100, 100, p), stroke = colorOr(st, 'strokeColor', '#000000'), fill = colorOr(st, 'fillColor', '#ffffff');
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 104 104"><circle cx="50" cy="50" r="50" fill="' + fill + '" stroke="' + stroke + '" stroke-width="5"/>' + (wd ? '<path d="' + wd + '" fill="' + stroke + '" stroke="' + stroke + '" stroke-width="5"/>' : '') + '</svg>';
+        st.shape = 'image'; st.image = 'data:image/svg+xml,' + btoa(svg); st.imageAspect = '0'; delete st.deHarvey;
+        srep.push({ page: pg.name, item: 'Harvey ball ' + p + '%', change: 'to embedded image' }); continue;
+      }
+      const lost = [];
+      if (shadowOf(st)) lost.push('shadow'); if (sb(st, 'deDouble', false)) lost.push('double outline (single outline kept)');
+      if (st.deIcon) lost.push('icon before the label'); if (bpSemantic(st.deMarker)) lost.push('marker'); if (st.deDots !== undefined) lost.push('dot matrix (plain fill kept)');
+      if (sb(st, 'deChecklist', false)) lost.push('clickable check boxes (the text keeps its boxes)');
+      if (lost.length) srep.push({ page: pg.name, item, change: 'not shown in Gliffy: ' + lost.join(', ') });
+    }
+  } },
   { id: 'customPoints', name: 'Remove custom connection point definitions from shapes', run: (doc) => { for (const pg of doc.pages) for (const c of pg.cells) if (!c.e) delete c.style.points; } },
   { id: 'editorData', name: 'Remove editor-only data (guides, grid display, ruler settings)', run: (doc) => { for (const pg of doc.pages) { pg.guides = []; pg.guidesLocked = false; pg.guidesVisible = true; pg.gridVisible = true; pg.rulers = true; } } }
 ];
@@ -532,7 +552,9 @@ function loadRegister() {
   try { const r = JSON.parse(localStorage.getItem(REG_KEY) || 'null'); if (r) return r; } catch (e) { }
   return [{ feature: 'Custom connection points', survives: 'Assumed no', transform: 'Re-point to nearest supported point', date: 'Not yet tested' },
     { feature: 'Sketch, Neon and Duotone styles', survives: 'Assumed no', transform: 'Sketch and Neon to Outline, Duotone to Filled', date: 'Not yet tested' },
-    { feature: 'Phosphor icons (draw.io stencils)', survives: 'Assumed no', transform: 'Embed as SVG image', date: 'Not yet tested' }];
+    { feature: 'Phosphor icons (draw.io stencils)', survives: 'Assumed no', transform: 'Embed as SVG image', date: 'Not yet tested' },
+    { feature: 'Harvey balls (draw.io stencils)', survives: 'Assumed no', transform: 'Embed as SVG image', date: 'Not yet tested' },
+    { feature: 'Blueprint extras: shadows, double outline, icons before labels, markers, dot matrix', survives: 'Assumed no', transform: 'None; listed in the export report', date: 'Not yet tested' }];
 }
 function registerDialog() {
   let rows = loadRegister();
@@ -569,7 +591,7 @@ async function loadTestDiagram() {
     T(40, 10, '1. Every shape');
     let x = 40, row = 0, n = 0;
     for (const d of SHAPE_LIB) {
-      if (d.key === 'container' || d.key === 'tabbed') continue;
+      if (d.key === 'container' || d.key === 'tabbed' || SHAPES_1_1.has(d.key)) continue; // 1.1.0 shapes are on the Blueprint page, so these pages stay as approved
       const c = V(d.key, x, 50 + row * 110, d.label); if (c.h > 90) { c.h = 90; } x += Math.max(c.w, 90) + 30; n++;
       if (n % 12 === 0) { x = 40; row++; }
     }
@@ -663,10 +685,39 @@ async function loadTestDiagram() {
   build('Test (Sketch)', 'sketch');
   build('Test (Neon dark)', 'neon', NAVY);
   build('Test (Neon light)', 'neon');
+  doc.pages.push(blueprintTestPage());
   doc.sketch = false; doc.mode = 'outline';
   S.doc = doc; S.pi = 0; S.sel = []; S.undo = []; S.redo = []; S.file = { handle: null, name: 'Test diagram.drawio' };
   clearCache(); setDirty(true); afterChange(); fitView();
   toast('Test diagram loaded: one page per diagram style.');
+}
+
+// Blueprint self-test page: every state, focus, external, a container, every line type with a verb, an icon, and the 1.1.0 shapes.
+function blueprintTestPage() {
+  const pg = newPage('Test (Blueprint)'), cells = pg.cells;
+  const V = (key, x, y, val, mod) => { const c = makeVertex(key, x, y, 'outline'); if (val !== undefined) c.value = val; if (mod) mod(c); cells.push(c); return c; };
+  const E = (s, t, verb, line) => { const e = makeEdge('outline'); e.source = s.id; e.target = t.id; cells.push(e); cells.push(makeEdgeLabel(e, verb, 0, { x: 0, y: 0 })); return [e, line]; };
+  cells.push(Object.assign(makeVertex('dots', 0, 0, 'outline'), { w: 1440, h: 1040 }));
+  V('text', 64, 24, 'Blueprint self-test', c => { c.w = 600; c.h = 44; c.style.align = 'left'; c.style.fontSize = '38'; });
+  const states = [''].concat(Object.keys(BP_EMPHASIS), Object.keys(BP_STATES));
+  const boxes = states.map((id, i) => V('rect', 64 + (i % 7) * 192, 120 + Math.floor(i / 7) * 120, id ? (bpState(id).label) : 'Plain', c => { c.w = 144; c.h = 64; c._state = id; }));
+  const cont = V('container', 40, 380, 'Boundary', c => { c.w = 1360; c.h = 380; });
+  const lines = BP_LINES.map(l => l.id), verbs = ['calls', 'will call', 'publishes', 'stops calling', 'see note', 'owns'];
+  const pairs = lines.map((l, i) => { const y = 430 + i * 52; const a = V('rect', 80, y, l, c => { c.w = 144; c.h = 40; }), b = V('rect', 600, y, '', c => { c.w = 144; c.h = 40; c.value = 'target'; }); return E(a, b, verbs[i], l); });
+  const ic = makeIconVertex('database', 900, 440, 'outline'); cells.push(ic);
+  V('harvey0', 900, 560); V('harvey25', 940, 560); V('harvey50', 980, 560); V('harvey75', 1020, 560); V('harvey100', 1060, 560);
+  V('checklist', 1120, 430, undefined, c => { c.w = 240; c.h = 90; });
+  V('question', 900, 640, undefined, c => { c.w = 420; });
+  const note = V('annotation', 520, 40); const an = makeEdge('outline'); an.style = parseStyle(ANNOTATION_EDGE_STYLE); an.source = note.id; an.target = boxes[1].id; cells.push(an);
+  V('calloutPanel', 64, 800, '<b>Gateway at 85% capacity</b><br>Scale before the cutover.', c => { c.w = 384; });
+  runStyleSwitch({ pages: [pg] }, 'outline', 'blueprint', Object.assign({}, STYLE_DEFAULTS.blueprint));
+  const o = STYLE_DEFAULTS.blueprint;
+  for (const c of boxes) { if (c._state) bpApplyState(c, c._state, o); delete c._state; }
+  boxes[1].style.deMarker = 'alert'; // a focus box can carry an alert marker
+  for (const [e, l] of pairs) bpSetLine(e, l);
+  cont.style.deCont = '1';
+  updateGroups(pg);
+  return pg;
 }
 
 /* ---------- start-up ---------- */
@@ -709,12 +760,13 @@ function init() {
       requestRender();
     });
   }
-  window.addEventListener('beforeunload', (e) => { if (S.dirty) { autosaveTick(); e.preventDefault(); e.returnValue = ''; } });
+  window.addEventListener('beforeunload', (e) => { if (S.dirty && !S.embed) { autosaveTick(); e.preventDefault(); e.returnValue = ''; } });
   setInterval(autosaveTick, 10000);
   loadRecent();
   refreshMap(); afterChange(); updateTitle();
   requestRender();
   setTimeout(() => checkAutosave(false), 300);
+  embedStart();
 }
 function guideDialog(i) {
   const g = page().guides[i]; if (!g) return;
@@ -725,4 +777,4 @@ function guideDialog(i) {
 }
 document.addEventListener('DOMContentLoaded', init);
 /* small scripting hook, used by the self-tests */
-window.DiagramEditor = { contrastRun, contrastPass, toneFix, textFix, wcagRatio, apcaLc, hexOklch, oklchHex, hueDelta, isLargeText, autoContrastOn, PALETTE, reparentToContainers, saveFile, openFile, startEdit, finishEdit, sanitizeHtml, safeUrl, safeCss, safeColour, parseStyle, styleStr, labelHtml, applyUiTheme, UI_THEMES, switchCanvas, retuneForCanvas, newDoc, clearCache, pathAbsToD, PH, loadPhosphor, makeIconVertex, runStyleSwitch, convertCell, contrast, styleOpts, STYLE_DEFAULTS, rybRotate, modeOf, setDiagramStyle, iconStyleForSave, dominantColour, phStencil, parsePathAbs, STYLE_MODES, S, renderAll, offeredPoints, computeRoutes, page, runCommand, serializeDoc, parseDrawio, loadText, buildExportSvg, renderToCanvas, mutate, makeVertex, makeEdge, makeEdgeLabel, refreshMap, toScreen, cellById, getPoints, constraintPoint, edgeRoute, exportGliffy, GLIFFY_TRANSFORMS, layeredLayout, applyShapeLayout, minimiseCrossings, countAllCrossings, setSel, fitView, makePdf, deep };
+window.DiagramEditor = { contrastRun, contrastPass, toneFix, textFix, wcagRatio, apcaLc, hexOklch, oklchHex, hueDelta, isLargeText, autoContrastOn, PALETTE, reparentToContainers, saveFile, openFile, startEdit, finishEdit, sanitizeHtml, safeUrl, safeCss, safeColour, parseStyle, styleStr, labelHtml, applyUiTheme, UI_THEMES, switchCanvas, retuneForCanvas, newDoc, clearCache, pathAbsToD, PH, loadPhosphor, makeIconVertex, runStyleSwitch, convertCell, contrast, styleOpts, STYLE_DEFAULTS, rybRotate, modeOf, setDiagramStyle, iconStyleForSave, dominantColour, phStencil, parsePathAbs, STYLE_MODES, S, renderAll, offeredPoints, computeRoutes, page, runCommand, serializeDoc, parseDrawio, loadText, buildExportSvg, renderToCanvas, mutate, makeVertex, makeEdge, makeEdgeLabel, refreshMap, toScreen, cellById, getPoints, constraintPoint, edgeRoute, exportGliffy, GLIFFY_TRANSFORMS, layeredLayout, applyShapeLayout, minimiseCrossings, countAllCrossings, setSel, fitView, makePdf, deep, BP, BP_STATES, BP_EMPHASIS, BP_LINES, bpApplyState, bpSetLine, bpState, shadowOf, setShadow, harveyStencil, toggleCheck, checkAt, fitChecklist, labelBox, insertShape, SHAPE_LIB, buildFormat, styleRole };

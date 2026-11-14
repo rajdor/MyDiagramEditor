@@ -19,7 +19,7 @@ function refreshMap() { S.map = cellMap(page()); return S.map; }
 
 /* ---------- history ---------- */
 function snapshot() { return JSON.stringify({ pi: S.pi, doc: S.doc }); }
-function setDirty(v) { S.dirty = v !== false; updateTitle(); }
+function setDirty(v) { S.dirty = v !== false; updateTitle(); if (S.embed) embedDirty(); }
 function mutate(fn, opts) {
   const snap = snapshot();
   fn();
@@ -619,6 +619,11 @@ function onPointerDown(ev) {
   }
   const gi = hitGuide(w);
   const hit = hitCell(w);
+  // checklist: a click on a check box ticks or unticks it (the rest of the box selects and moves as usual)
+  if (ev.button === 0 && hit && !ev.shiftKey && !ev.altKey && sb(hit.style, 'deChecklist', false)) {
+    const n = checkAt(hit, w);
+    if (n >= 0) { mutate(() => { hit.value = toggleCheck(hit.value, n); }); S.drag = null; return; }
+  }
   if (gi >= 0 && (!hit || page().guides[gi] && Math.abs((page().guides[gi].o === 'h' ? w.y : w.x) - page().guides[gi].p) < 3 / S.zoom)) {
     if (!page().guidesLocked) {
       if (ev.shiftKey) { S.selGuides = S.selGuides.includes(gi) ? S.selGuides.filter(i => i !== gi) : S.selGuides.concat([gi]); }
@@ -958,6 +963,7 @@ function startEdit(c, isNew) {
     e.stopPropagation();
     if (e.key === 'Escape') { e.preventDefault(); finishEdit(true); } // cancel: the text goes back to what it was
     else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finishEdit(); }
+    else if (e.key === 'Enter' && !e.shiftKey && !e.altKey && sb(c.style, 'deChecklist', false)) { e.preventDefault(); document.execCommand('insertHTML', false, '<br>' + CHECK_OFF + '&nbsp;'); } // a new item
     if ((e.ctrlKey || e.metaKey) && ['b', 'i', 'u'].includes(e.key.toLowerCase())) { e.preventDefault(); document.execCommand({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]); }
   });
   ed.addEventListener('input', () => positionEditor(true));
@@ -996,7 +1002,7 @@ function finishEdit(cancel) {
     const plain = htmlToPlain(html).replace(/​/g, '').trim();
     const old = labelHtml(c);
     if (c.isEdgeLabel && !plain) { page().cells.splice(page().cells.indexOf(c), 1); S.sel = []; }
-    else if (html !== old) { c.value = plain ? html : ''; c.style.html = '1'; fitFolderTab(c); }
+    else if (html !== old) { c.value = plain ? html : ''; c.style.html = '1'; fitFolderTab(c); fitChecklist(c); }
     refreshMap();
     if (snapshot() !== E.pre) pushUndo(E.pre);
   } else if (c && cancel && E.isNew && S.undo.length) { restore(S.undo.pop()); S.sel = []; } // cancelling a brand-new text box or label removes it

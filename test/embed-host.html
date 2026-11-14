@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Embed host (test page for t43)</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; frame-src file: 'self'; style-src 'unsafe-inline'">
+</head>
+<body style="margin:0">
+<!-- A stand-in for the document editor: it opens the diagram editor in an iframe and records every message it sends. -->
+<iframe id="ed" src="../diagram-editor.html" style="width:1400px;height:860px;border:0"></iframe>
+<script>
+window.got = [];
+window.addEventListener('message', function (e) { if (e.source === document.getElementById('ed').contentWindow) window.got.push(e.data); });
+window.sendInit = function (msg) { document.getElementById('ed').contentWindow.postMessage(msg, '*'); };
+</script>
+</body>
+</html>

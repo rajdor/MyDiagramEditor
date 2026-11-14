@@ -6,14 +6,16 @@ const STYLE_MODES = [
   { id: 'filled', label: 'Filled', hint: 'Solid or tinted colour shapes' },
   { id: 'duotone', label: 'Duotone', hint: 'Two harmonising colours' },
   { id: 'sketch', label: 'Sketch', hint: 'Hand-drawn whiteboard' },
-  { id: 'neon', label: 'Neon', hint: 'Glowing lines, best on dark backgrounds' }
+  { id: 'neon', label: 'Neon', hint: 'Glowing lines, best on dark backgrounds' },
+  { id: 'blueprint', label: 'Blueprint', hint: 'Navy ink on a dotted page, with status colours' }
 ];
 const STYLE_DEFAULTS = {
   outline: { override: true, fill: 'auto', preset: 'Blue', iconOverride: false, iconPreset: 'Blue', resetFont: true, whiteCanvas: true },
   filled: { override: true, fill: 'block', preset: 'Blue', iconOverride: true, icon: 'block', iconPreset: 'Blue', whiteCanvas: true },
   duotone: { override: true, scheme: 'analogous', ccw: false, tint: 'standard', scope: 'shape', whiteCanvas: true },
   sketch: { fillStyle: 'hachure', rough: 'normal', font: true, whiteCanvas: false },
-  neon: { darkCanvas: true }
+  neon: { darkCanvas: true },
+  blueprint: { sizes: true, shadows: true, whiteCanvas: true }
 };
 const DUO_SCHEMES = [
   { id: 'monochromatic', label: 'Monochromatic', deg: 0 }, { id: 'analogous', label: 'Analogous', deg: 30 },
@@ -90,6 +92,8 @@ function styleRole(c) {
   if (c.e) return 'edge';
   if (c.isEdgeLabel) return 'label';
   if (c.style.dePh) return 'icon';
+  if (c.style.deDots !== undefined) return 'background';
+  if (c.style.deHarvey !== undefined) return 'harvey';
   const k = shapeKind(c);
   if (k === 'text' || k === 'edgeLabel') return 'text';
   if (c.style.deCont === '1' || k === 'folder' || k === 'partialRect' || c.style.container === '1' || c.style.swimlane !== undefined || (c.style.fillColor || '') === 'none') return 'container';
@@ -116,6 +120,7 @@ function presetByName(n) { return PALETTE.find(p => p.name === n) || PALETTE[1];
 // To Outline (permutations 5, 9, 13, 17 and the first step of the others).
 function toOutline(c, from, o) {
   const st = c.style, role = styleRole(c);
+  if (from === 'blueprint' || st.deMode === 'blueprint') fromBlueprint(c);
   if (sb(st, 'sketch', false)) applySketch(c, false, { resetFont: o.resetFont !== false });
   if (from === 'neon' || st.deGlow) {
     delete st.deGlow; delete st.fillOpacity;
@@ -126,7 +131,7 @@ function toOutline(c, from, o) {
   if (role === 'icon') {
     setIconWeight(c, 'regular'); delete st.deC2;
     if (o.iconOverride) st.fillColor = presetByName(o.iconPreset).stroke;
-  } else if ((role === 'shape' || role === 'container') && (from === 'filled' || from === 'duotone' || from === 'neon')) {
+  } else if ((role === 'shape' || role === 'container') && (from === 'filled' || from === 'duotone' || from === 'neon' || from === 'blueprint')) {
     const f = st.fillColor;
     if (o.override || !existingFill(f)) {
       if (role === 'container') { if (strongFill(f)) st.fillColor = tintOf(f, 0.94); }
@@ -201,13 +206,17 @@ function toSketch(c, o) {
 // One cell from style `from` to style `to` (docs/STYLES.md, permutations 1 to 20).
 function convertCell(c, from, to, o, ctx) {
   if (isGroupCell(c)) return;
+  if (c.style.deDots !== undefined) return; // background sheets keep their own look in every style
   // Containers are recognised once (no fill, dashed boxes) and marked, so they stay containers after they get a tint.
   if (!c.e && !c.isEdgeLabel && styleRole(c) === 'container' && shapeKind(c) !== 'folder' && shapeKind(c) !== 'partialRect') c.style.deCont = '1';
-  if (to === 'sketch') { toSketch(c, o); return; }
+  if (to === 'sketch') { if (from === 'blueprint' || c.style.deMode === 'blueprint') toOutline(c, 'blueprint', Object.assign({}, STYLE_DEFAULTS.outline, { resetFont: true })); toSketch(c, o); return; }
   if (from !== 'outline' || sb(c.style, 'sketch', false) || c.style.deGlow) toOutline(c, from, to === 'outline' ? o : Object.assign({}, STYLE_DEFAULTS.outline, { resetFont: true }));
   if (to === 'filled') toFilled(c, o);
   else if (to === 'duotone') toDuotone(c, o, ctx);
   else if (to === 'neon') toNeon(c, ctx);
+  else if (to === 'blueprint') toBlueprint(c, o, ctx);
+  // a Harvey ball's wedge is its outline colour, so its fill must never become that colour
+  if (c.style.deHarvey !== undefined && hexRgb(c.style.fillColor) && String(c.style.fillColor).toLowerCase() === String(c.style.strokeColor).toLowerCase()) { c.style.fillColor = '#ffffff'; delete c.style.fillOpacity; }
 }
 
 /* ---------- readability: see src/contrast.js ---------- */
@@ -219,11 +228,13 @@ function runStyleSwitch(doc, from, to, o) {
     const bg = pageBackground(pg);
     if (to === 'neon' && o.darkCanvas && !isDarkBg(bg)) pg.modelAttrs = Object.assign({}, pg.modelAttrs, { background: NAVY });
     if (from === 'neon' && to !== 'neon' && o.whiteCanvas && isDarkBg(bg)) { pg.modelAttrs = Object.assign({}, pg.modelAttrs); delete pg.modelAttrs.background; }
+    if (to === 'blueprint' && o.whiteCanvas && bg.toLowerCase() !== '#ffffff') { pg.modelAttrs = Object.assign({}, pg.modelAttrs); delete pg.modelAttrs.background; } // Blueprint pages are white
   }
   const dominant = dominantColour(doc);
   let fixed = 0;
   for (const pg of doc.pages) {
     const canvas = pageBackground(pg), ctx = { dark: isDarkBg(canvas), dominant, canvas };
+    if (to === 'blueprint') ctx.routes = computeRoutes(pg, cellMap(pg)).routes; // to place line labels beside their lines
     for (const c of pg.cells) convertCell(c, modeOf(c), to, o, ctx);
   }
   const report = autoContrastOn() ? contrastRun(doc, { apply: true }) : contrastRun(doc, { apply: false });

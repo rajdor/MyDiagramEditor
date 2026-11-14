@@ -1,6 +1,6 @@
 # Security model
 
-Version 1.0.0. The editor is one offline HTML file. It has no server, no account and no network access. The main risk is a **hostile diagram file**: a `.drawio` file from someone else, an autosave, or text pasted as draw.io XML. Everything in a file is treated as untrusted.
+Version 1.1.0. The editor is one offline HTML file. It has no server, no account and no network access. The main risk is a **hostile diagram file**: a `.drawio` file from someone else, an autosave, or text pasted as draw.io XML. Everything in a file is treated as untrusted.
 
 ## What a hostile file cannot do
 
@@ -16,6 +16,7 @@ Version 1.0.0. The editor is one offline HTML file. It has no server, no account
 | Crash or hang from a damaged file: parent loops, missing or duplicate ids, missing parents, dangling line ends, `Infinity` or huge numbers, bad guide data | Repaired on open: new ids for missing and duplicate ids, loops and missing parents moved to the first layer, numbers limited to +/- 10 million, guides validated | `readModel`, `readGeo` | t34 |
 | Decompression bomb (a small compressed page that expands to gigabytes) | Each compressed page may expand to at most 64 MB | `inflateRawB64` | t34 |
 | Very large files | Files over 100 MB are refused with a message | `openFileObject` in `src/ui3.js` | t36 |
+| A page that frames the editor sending it messages | Only `de:init` from `window.parent` is accepted; its XML is treated exactly like an opened file (sanitiser, repairs, 100 MB limit). Replies go only to the parent window that framed the editor (docs/EMBED.md) | `src/embed.js` | t43 |
 | Entity expansion ("billion laughs") | The browser's XML parser limits entity expansion; checked by test | `parseDrawio` | t34 |
 
 Exports are safe to open elsewhere: SVG export converts label HTML into plain SVG text (no `foreignObject`, no script), PDF and PNG are images.

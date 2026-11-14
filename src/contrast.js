@@ -140,6 +140,8 @@ function contrastPass(pg, opts) {
   for (const c of opts.cells || pg.cells) {
     if (isGroupCell(c) || isHiddenByLayer(pg, c, map2)) continue;
     const st = c.style, hasText = !!htmlToPlain(String(c.value || '')).trim(), tTarget = isLargeText(st) ? LARGE_TEXT_MIN : TEXT_MIN;
+    // Blueprint states are the style guide's own tested pairs (ink on fill 4.5:1); background sheets carry no meaning
+    if ((st.deMode === 'blueprint' && bpState(st.deState)) || st.deDots !== undefined) continue;
     if (c.e) {
       if (opts.only === 'text') continue;
       const mid = edgeMid(pg, c, map2); const bg = mid ? colourBehind(pg, mid, c, canvas, map) : { col: canvas, desc: 'canvas' };
