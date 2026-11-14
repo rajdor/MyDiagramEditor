@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+- BUG-001: while editing a label, Text, Size now changes the selected words. Clicking the Size box used to take the selection out of the label, so nothing changed. The label keeps its selection and stays in editing, so Size can be changed again; with only a caret (nothing selected), Size applies to the whole label
+
+### Tests
+- t44: Size on selected words through the real input, standalone and in embed mode; a second change, Font and Bold on the selection, caret sizes the whole label, saved label, Size when not editing
+
 ## 1.1.0 (14 November 2026)
 
 ### Features

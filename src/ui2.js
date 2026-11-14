@@ -880,7 +880,7 @@ function formatText(cells, edges) {
   const s = fsec('Text');
   const ed = !!S.editing;
   const fs = sn(st, 'fontStyle', 0);
-  const exec = (cmd, val) => { document.execCommand('styleWithCSS', false, true); document.execCommand(cmd, false, val); };
+  const exec = (cmd, val, whole) => { restoreEditSel(whole); document.execCommand('styleWithCSS', false, true); document.execCommand(cmd, false, val); };
   const bits = (bit) => () => { if (ed) return exec({ 1: 'bold', 2: 'italic', 4: 'underline' }[bit]); applyStyle(cl => { const v = sn(cl.style, 'fontStyle', 0) ^ bit; setStyle(cl.style, 'fontStyle', v || null); }, cl => !cl.e); };
   const r1 = frow(s); const g1 = document.createElement('div'); g1.className = 'btngrp';
   g1.appendChild(mkBtn('<b>B</b>', bits(1), !ed && fs & 1 ? 'on' : '', 'Bold')); g1.appendChild(mkBtn('<i>I</i>', bits(2), !ed && fs & 2 ? 'on' : '', 'Italic')); g1.appendChild(mkBtn('<u>U</u>', bits(4), !ed && fs & 4 ? 'on' : '', 'Underline'));
@@ -890,7 +890,7 @@ function formatText(cells, edges) {
   const r2 = frow(s, 'Font');
   r2.appendChild(mkSel(fonts.map(f => ({ v: f, label: f })), sv(st, 'fontFamily', DEFAULT_FONT), (v) => { if (ed) return exec('fontName', v); applyStyle(cl => { if (v === DEFAULT_FONT) { delete cl.style.fontFamily; delete cl.style.fontSource; } else { cl.style.fontFamily = v; if (v === SKETCH_FONT) cl.style.fontSource = SKETCH_FONT_SOURCE; else delete cl.style.fontSource; } }, cl => !cl.e); }));
   const r3 = frow(s, 'Size');
-  r3.appendChild(mkNum(sn(st, 'fontSize', 12), (v) => { if (ed) { exec('fontSize', 7); S.editing.ed.querySelectorAll('font[size="7"]').forEach(f => { f.removeAttribute('size'); f.style.fontSize = v + 'px'; }); S.editing.ed.querySelectorAll('span').forEach(sp => { if (sp.style.fontSize === 'xxx-large' || sp.style.fontSize === '-webkit-xxx-large') sp.style.fontSize = v + 'px'; }); return; } applyStyle(cl => { cl.style.fontSize = String(clamp(v, 4, 200)); }, cl => !cl.e); }, 1, 4));
+  r3.appendChild(mkNum(sn(st, 'fontSize', 12), (v) => { if (ed) { exec('fontSize', 7, true); S.editing.ed.querySelectorAll('font[size="7"]').forEach(f => { f.removeAttribute('size'); f.style.fontSize = v + 'px'; }); S.editing.ed.querySelectorAll('span').forEach(sp => { if (sp.style.fontSize === 'xxx-large' || sp.style.fontSize === '-webkit-xxx-large') sp.style.fontSize = v + 'px'; }); return; } applyStyle(cl => { cl.style.fontSize = String(clamp(v, 4, 200)); }, cl => !cl.e); }, 1, 4));
   r3.appendChild(mkColor(sv(st, 'fontColor', '#1e293b'), ed ? (v, live) => { if (!live) exec('foreColor', v); } : liveColor('fontColor', cl => !cl.e)));
   const verts = tcells.filter(c => !c.isEdgeLabel);
   if (verts.length) {

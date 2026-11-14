@@ -42,7 +42,7 @@ Diagram files are treated as untrusted. Opening one cannot run script, load anyt
 ```
 npm ci               # installs the exact versions in package-lock.json (Node.js 22.12 or later)
 npm run build        # writes diagram-editor.html
-npm test             # all 43 test files (about 5 minutes); results in test/out/results.txt
+npm test             # all 44 test files (about 5 minutes); results in test/out/results.txt
 npm run lint         # static checks only (ESLint on the built script)
 ```
 

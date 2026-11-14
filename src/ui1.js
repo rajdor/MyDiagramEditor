@@ -972,6 +972,21 @@ function startEdit(c, isNew) {
   requestRender(); buildFormat();
   if (document.activeElement !== ed) setTimeout(focusAll, 0);
 }
+// While a label is being edited, remember its last selection. Format panel fields such as Size take focus and the selection,
+// so the Text section puts it back before formatting (BUG-001).
+document.addEventListener('selectionchange', () => {
+  const E = S.editing; if (!E) return;
+  const s = window.getSelection(); if (!s.rangeCount) return;
+  const rg = s.getRangeAt(0); if (E.ed.contains(rg.commonAncestorContainer)) E.range = rg.cloneRange();
+});
+// Focus the label and select its remembered range; with wholeIfEmpty, a caret or no range selects the whole label.
+function restoreEditSel(wholeIfEmpty) {
+  const E = S.editing; if (!E) return;
+  E.ed.focus();
+  let rg = E.range && E.ed.contains(E.range.commonAncestorContainer) ? E.range : null;
+  if (!rg || (wholeIfEmpty && rg.collapsed)) { rg = document.createRange(); rg.selectNodeContents(E.ed); }
+  const s = window.getSelection(); s.removeAllRanges(); s.addRange(rg);
+}
 function clearCacheFor(id) { const e = S.cache.get(id); if (e) { e.g.remove(); S.cache.delete(id); } }
 function positionEditor(keepContent) {
   if (!S.editing) return;
