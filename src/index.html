@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Offline by design: nothing may be loaded from or sent to the network, even by a hostile diagram file. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src data: blob:; base-uri 'none'; form-action 'none'">
+<title>Diagram Editor</title>
+<style>
+@font-face { font-family: 'Architects Daughter'; src: url(data:font/woff2;base64,/*FONT_B64*/) format('woff2'); font-weight: 400; font-style: normal; }
+/*CSS*/
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="menubar">
+    <div class="brand"><svg viewBox="0 0 24 24" width="18" height="18"><rect x="2" y="3" width="8" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="15" width="8" height="6" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 9v5a2 2 0 0 0 2 2h6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg><span id="appName">Diagram Editor</span></div>
+    <nav id="menus"></nav>
+    <div id="docTitle" title="Click to rename"></div>
+  </header>
+  <div id="toolbar"></div>
+  <div id="main">
+    <aside id="palette"></aside>
+    <div id="center">
+    <nav id="pagebar"><div id="tabs"></div><button id="addPage" title="Add page">+</button><div id="statusText"></div></nav>
+    <div id="stage">
+      <canvas id="rulerTop"></canvas>
+      <canvas id="rulerLeft"></canvas>
+      <div id="rulerCorner" title="Toggle rulers"></div>
+      <div id="viewport">
+        <svg id="svg" xmlns="http://www.w3.org/2000/svg">
+          <defs id="defs"><!--GLOW--></defs>
+          <g id="view"><g id="gridLayer"></g><g id="content"></g><g id="overlay"></g></g>
+        </svg>
+        <div id="htmlLayer"></div>
+      </div>
+    </div>
+    </div>
+    <aside id="format"></aside>
+  </div>
+</div>
+<div id="menuPopup" class="popup hidden"></div>
+<div id="modalRoot"></div>
+<div id="toast" class="hidden"></div>
+<input type="file" id="fileInput" accept=".drawio,.xml,.dio,application/xml,text/xml" hidden>
+<script>/*ROUGH*/</script>
+<script>
+/*APP*/
+</script>
+</body>
+</html>

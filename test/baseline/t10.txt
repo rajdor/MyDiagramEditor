@@ -1,0 +1,3 @@
+ours: vertices+labels 158 edges 47 | mxGraph: vertices 158 edges 47 problems 0
+edges compared 47 endpoints within 2px 47 identical routes 47
+no errors

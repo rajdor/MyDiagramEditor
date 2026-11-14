@@ -1,0 +1,2 @@
+{"cells":2,"w":120,"edge":true,"exit":["1","0.5"],"tp":{"x":470,"y":290}}
+no errors

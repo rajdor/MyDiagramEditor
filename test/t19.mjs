@@ -1,0 +1,12 @@
+import { open } from './harness.mjs';
+const { b, pg, errors } = await open();
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+await pg.evaluate(() => { const E = DiagramEditor; E.mutate(() => { const a = E.makeVertex('process', 200, 200); E.page().cells.push(a); E.S.sel = [a.id]; }); });
+await sleep(200);
+const scr = (wx, wy) => pg.evaluate((wx, wy) => { const r = document.querySelector('#viewport').getBoundingClientRect(); const p = DiagramEditor.toScreen({ x: wx, y: wy }); return { x: r.left + p.x, y: r.top + p.y }; }, wx, wy);
+const p = await scr(320, 230);
+await pg.mouse.move(p.x - 20, p.y); await pg.mouse.move(p.x, p.y, { steps: 3 }); await sleep(50);
+await pg.mouse.down(); await pg.mouse.move(p.x + 150, p.y + 60, { steps: 6 }); await pg.mouse.up(); await sleep(100);
+console.log(await pg.evaluate(() => { const P = DiagramEditor.page(); return JSON.stringify({ cells: P.cells.length, w: P.cells[0].w, edge: P.cells[1] && P.cells[1].e, exit: P.cells[1] && [P.cells[1].style.exitX, P.cells[1].style.exitY], tp: P.cells[1] && P.cells[1].tp }); }));
+console.log(errors.join('\n') || 'no errors');
+await b.close();

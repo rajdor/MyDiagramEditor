@@ -1,0 +1,29 @@
+<!doctype html><html><head><script>var mxLoadResources=false, mxLoadStylesheets=false, mxBasePath='../node_modules/mxgraph/javascript/src';</script>
+<script src="../node_modules/mxgraph/javascript/mxClient.min.js"></script></head>
+<body style="margin:0"><div id="g" style="position:absolute;inset:0;overflow:hidden"></div>
+<script>
+window.renderXml = function (modelXml) {
+  const container = document.getElementById('g');
+  const graph = new mxGraph(container);
+  graph.setHtmlLabels(true);
+  graph.foldingEnabled = false;
+  const ss = graph.getStylesheet(); ss.putCellStyle('ellipse', { shape: 'ellipse', perimeter: mxPerimeter.EllipsePerimeter }); ss.putCellStyle('rhombus', { shape: 'rhombus', perimeter: mxPerimeter.RhombusPerimeter }); ss.putCellStyle('text', { fillColor: 'none', strokeColor: 'none' });
+  const doc = mxUtils.parseXml(modelXml);
+  const codec = new mxCodec(doc);
+  codec.decode(doc.documentElement, graph.getModel());
+  const out = { vertices: 0, edges: 0, edgeInfo: {} , problems: [] };
+  const model = graph.getModel();
+  for (const id in model.cells) {
+    const c = model.cells[id];
+    if (c.vertex) out.vertices++;
+    if (c.edge) {
+      out.edges++;
+      const st = graph.view.getState(c);
+      if (!st) { out.problems.push('no state for edge ' + id); continue; }
+      out.edgeInfo[id] = st.absolutePoints.filter(Boolean).map(p => [Math.round(p.x), Math.round(p.y)]);
+      if (c.source && !model.getCell(c.source.id)) out.problems.push('missing source ' + id);
+    }
+  }
+  return out;
+};
+</script></body></html>

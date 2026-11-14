@@ -1,0 +1,1 @@
+jettySize=auto incl. self loops: identical 40 of 40

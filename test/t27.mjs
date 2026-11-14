@@ -1,0 +1,15 @@
+import { open } from './harness.mjs';
+const { b, pg, errors } = await open();
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+await pg.evaluate(() => DiagramEditor.runCommand('testDiagram')); await sleep(500);
+await pg.evaluate(() => { const E = DiagramEditor; E.setSel([E.page().cells.find(c => !c.e && !c.isEdgeLabel && c.style.group === undefined && c.value).id]); });
+await pg.evaluate(() => DiagramEditor.runCommand('canvasBg')); await sleep(200);
+await pg.evaluate(() => { document.querySelector('.sw[data-c="#f1f5f9"]').click(); const bs = Array.from(document.querySelectorAll('.modal footer .btn')); bs[bs.length - 1].click(); });
+await pg.keyboard.down('Control'); await pg.keyboard.down('Shift'); await pg.keyboard.press('KeyE'); await pg.keyboard.up('Shift'); await pg.keyboard.up('Control'); await sleep(2500);
+await pg.screenshot({ path: 'test/out/s_clean.png' });
+const xml = await pg.evaluate(() => DiagramEditor.serializeDoc(DiagramEditor.S.doc));
+console.log('background saved:', /background="#f1f5f9"/.test(xml), 'clean:', await pg.evaluate(() => DiagramEditor.S.clean));
+await pg.keyboard.press('Escape'); await sleep(200);
+console.log('after Esc clean:', await pg.evaluate(() => DiagramEditor.S.clean));
+console.log(errors.join('\n') || 'no errors');
+await b.close();

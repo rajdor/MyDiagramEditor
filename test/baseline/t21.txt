@@ -1,0 +1,2 @@
+tabs fit their labels (longer label, wider tab): true
+no errors

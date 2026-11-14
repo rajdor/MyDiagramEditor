@@ -1,0 +1,1 @@
+250 shapes and 250 lines: routing and full render within budget {"routesMs":150,"renderAllMs":300}

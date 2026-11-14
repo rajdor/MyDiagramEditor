@@ -1,0 +1,22 @@
+GLIFFY REPORT:
+Saved Test diagram-gliffy.drawio. Your own file is unchanged. Transformations applied:
+Re-point line ends on custom or unsupported connection points to the closest supported point on the same side
+Convert diagram styles Gliffy cannot show: Sketch and Neon to Outline, Duotone to Filled. No shapes are removed
+Embed Phosphor icons as images (SVG), keeping their size, position, colour and label
+Remove custom connection point definitions from shapes
+Remove editor-only data (guides, grid display, ruler settings)
+42 line ends were re-pointed:
+PAGE	LINE	END	SHAPE	FROM	TO
+Test (Outline)	ellipse → Circle (8 points)	end	Circle (8 points)	0.854, 0.146	0.75, 0
+Test (Outline)	ellipse → Circle (8 points)	end	Circle (8 points)	0.854, 0.854	1, 0.75
+Test (Outline)	ellipse → Circle (8 points)	end	Circle (8 points)	0.146, 0.854	0, 0.75
+Test (Outline)	ellipse → Circle (8 points)	end	Circle (8 points)	0.146, 0.146	0, 0.25
+Test (Outline)	x → Custom points	end	Custom points	0.1, 0	0.25, 0
+Test (Outline)	Custom points → y	start	Custom points	0.9, 1	0.75, 1
+Test (Outline)	z → Custom points	end	Custom points	0, 0.9	0, 0.75
+Test (Filled)	ellipse → Circle (8 points)	end	Circle (8 points)	0.854, 0.146	0.75,
+download Test diagram.svg over 20000 bytes
+download Test diagram.png over 100000 bytes
+download Test diagram.pdf over 100000 bytes
+download Test diagram-gliffy.drawio over 100000 bytes
+no errors

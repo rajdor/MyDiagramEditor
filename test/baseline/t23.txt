@@ -1,0 +1,5 @@
+paste 1: 215,215
+paste 2: 230,230
+duplicate: 215,215
+near edge (817,705) pasted at: 20,20
+no errors

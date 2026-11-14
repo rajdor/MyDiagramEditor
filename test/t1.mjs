@@ -1,0 +1,13 @@
+import { open } from './harness.mjs';
+const { b, pg, errors } = await open();
+await pg.screenshot({ path: 'test/out/s_empty.png' });
+await pg.evaluate(() => DiagramEditor.runCommand('testDiagram'));
+await new Promise(r => setTimeout(r, 800));
+await pg.screenshot({ path: 'test/out/s_test.png' });
+await pg.evaluate(() => { DiagramEditor.S.pi = 1; DiagramEditor.runCommand('fit'); });
+await pg.evaluate(() => { const E=DiagramEditor; E.S.pi=1; });
+await pg.click('#tabs .tab:nth-child(2)');
+await new Promise(r => setTimeout(r, 800));
+await pg.screenshot({ path: 'test/out/s_sketch.png' });
+console.log(errors.join('\n') || 'no errors');
+await b.close();

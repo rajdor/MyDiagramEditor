@@ -1,0 +1,3 @@
+pointerdown:path pointerup:svg click:svg pointerdown:path pointerup:DIV click:viewport pointerdown:DIV pointerup:DIV click:DIV dblclick:DIV
+editing? {"ed":true,"n":4}
+no errors

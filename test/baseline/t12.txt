@@ -1,0 +1,16 @@
+random edges 59 identical 59 same endpoints 59
+elbow flS fixT           n=2 identical=2 endpoints=2
+curved fixS fixT         n=5 identical=5 endpoints=5
+straight flS fixT        n=2 identical=2 endpoints=2
+straight fixS flT        n=3 identical=3 endpoints=3
+curved fixS flT          n=4 identical=4 endpoints=4
+straight fixS fixT       n=7 identical=7 endpoints=7
+curved flS flT           n=9 identical=9 endpoints=9
+straight flS flT         n=3 identical=3 endpoints=3
+curved flS fixT          n=5 identical=5 endpoints=5
+soft fixS fixT           n=1 identical=1 endpoints=1
+soft flS flT             n=4 identical=4 endpoints=4
+elbow fixS flT           n=6 identical=6 endpoints=6
+soft fixS flT            n=3 identical=3 endpoints=3
+elbow flS flT            n=3 identical=3 endpoints=3
+soft flS fixT            n=2 identical=2 endpoints=2

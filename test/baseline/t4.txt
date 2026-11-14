@@ -1,0 +1,7 @@
+active ed
+H H | active=ed
+e He | active=ed
+l Hel | active=ed
+l Hell | active=ed
+o Hello | active=ed
+no errors

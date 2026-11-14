@@ -1,0 +1,2 @@
+manual bends added by auto arrange: {"afterLinesOnly":0,"afterLayered":0,"maxBendsInAnyRoute":3}
+PASS

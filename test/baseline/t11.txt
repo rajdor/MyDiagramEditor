@@ -1,0 +1,18 @@
+source exit side (rows dy, cols dx)
+       -360 -320 -280 -240 -200 -160 -120  -80  -40    0   40   80  120  160  200  240  280  320  360
+ -300    LB   LB   LB   LB   LB   LB   LB   TB   TB   TB   TB   TB   RB   RB   RB   RB   RB   RB   RB
+ -260    LB   LB   LB   LB   LB   LB   LB   TB   TB   TB   TB   TB   RB   RB   RB   RB   RB   RB   RB
+ -220    LB   LB   LB   LB   LB   LB   LB   TB   TB   TB   TB   TB   RB   RB   RB   RB   RB   RB   RB
+ -180    LB   LB   LB   LB   LB   LB   LB   TB   TB   TB   TB   TB   RB   RB   RB   RB   RB   RB   RB
+ -140    LB   LB   LB   LB   LB   LB   LB   TB   TB   TB   TB   TB   RB   RB   RB   RB   RB   RB   RB
+ -100    LB   LB   LB   LB   LB   LB   LB   TB   TB   TB   TB   TB   RB   RB   RB   RB   RB   RB   RB
+  -60    LR   LR   LR   LR   LR   LR   LR   TB   TB   TB   TB   TB   RL   RL   RL   RL   RL   RL   RL
+  -20    LR   LR   LR   LR   LR   LR   LR   TB   TT   TB   TT   TB   RL   RL   RL   RL   RL   RL   RL
+   20    LR   LR   LR   LR   LR   LR   LR   BT   BB   BT   BB   BT   RL   RL   RL   RL   RL   RL   RL
+   60    LR   LR   LR   LR   LR   LR   LR   BT   BT   BT   BT   BT   RL   RL   RL   RL   RL   RL   RL
+  100    LT   LT   LT   LT   LT   LT   LT   BT   BT   BT   BT   BT   RT   RT   RT   RT   RT   RT   RT
+  140    LT   LT   LT   LT   LT   LT   LT   BT   BT   BT   BT   BT   RT   RT   RT   RT   RT   RT   RT
+  180    LT   LT   LT   LT   LT   LT   LT   BT   BT   BT   BT   BT   RT   RT   RT   RT   RT   RT   RT
+  220    LT   LT   LT   LT   LT   LT   LT   BT   BT   BT   BT   BT   RT   RT   RT   RT   RT   RT   RT
+  260    LT   LT   LT   LT   LT   LT   LT   BT   BT   BT   BT   BT   RT   RT   RT   RT   RT   RT   RT
+  300    LT   LT   LT   LT   LT   LT   LT   BT   BT   BT   BT   BT   RT   RT   RT   RT   RT   RT   RT
