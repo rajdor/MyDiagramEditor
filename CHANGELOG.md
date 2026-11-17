@@ -4,8 +4,14 @@
 
 ### Fixes
 - BUG-001: while editing a label, Text, Size now changes the selected words. Clicking the Size box used to take the selection out of the label, so nothing changed. The label keeps its selection and stays in editing, so Size can be changed again; with only a caret (nothing selected), Size applies to the whole label
+- BUG-002: the points shown by Edit points are now the points a line can attach to. A shape with its default points used to show its stored points in Edit points but offer a different, size-based set on hover, so some points could not be used until one was edited. Edit points now starts from the points offered; a point too crowded to offer at the current zoom is shown faded; other shapes stay connectable while one is being edited
+
+### Changes
+- A label added to a line by hand (Add label, or a double-click on the line) now starts with a background in the canvas colour in every style, including Blueprint and Neon, so the line does not run through its words. Text, Transparent removes it. Labels restyled with a whole diagram keep the style's own rule
 
 ### Tests
+- t46: a label added to a line has a canvas-coloured background in all six styles, by command and by double-click; restyled labels unchanged; Transparent still works
+- t45: Edit points shows the points offered on hover; added, moved and removed points are offered at once; lines from and to an added point; other shapes connectable while editing; crowded points faded; Reset to defaults
 - t44: Size on selected words through the real input, standalone and in embed mode; a second change, Font and Bold on the selection, caret sizes the whole label, saved label, Size when not editing
 
 ## 1.1.0 (14 November 2026)

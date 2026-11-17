@@ -1,6 +1,6 @@
 # Tests
 
-Version 1.1.0: 44 test files. Run them all from the repository root:
+Version 1.1.0: 46 test files. Run them all from the repository root:
 
 ```
 npm test                          # every test, about 5 minutes; summary in the console, details in test/out/results.txt
@@ -65,5 +65,7 @@ Only checks that do not depend on installed fonts are in baselines, so they pass
 | t42 | **Blueprint**: tokens by role, all 13 states and 6 line types (dash lengths in pixels), switches to and from every style with one Undo step, Outline to Blueprint to Outline to Blueprint round trip, contrast, SVG export (dots, crisp shadows, double outline, markers, icons, no blur), Harvey ball stencils and draw.io round trip, fixed dot spacing, hostile style values, checklist ticking and Enter |
 | t43 | **Embed mode**: the editor in an iframe of `test/embed-host.html`: de:ready, normal until de:init, other senders ignored, Done and Cancel instead of file commands, no autosave, de:dirty, de:save (XML reopens identically, every SVG id prefixed and references matching, a new prefix each time, no fonts, role, aria-label and title, text kept as text, dot matrix), Cancel asks when there are changes, a new diagram in the requested style |
 | t44 | **Text size while editing** (BUG-001): Size through the real input changes only the selected words, keeps the selection and editing, a caret sizes the whole label, Font and Bold still format the selection; standalone and in embed mode |
+| t45 | **Edit points and hover agree** (BUG-002): Edit points shows exactly the points offered on hover; a point added, moved or removed is offered at once; a line can be drawn from and to an added point; other shapes stay connectable while one is edited, and dragging from one ends the editing; crowded points are faded; Reset to defaults |
+| t46 | **New line labels have a background**: a label added by the Add label command or by double-clicking a line starts with the canvas colour in all six styles; labels restyled with the diagram keep the style's rule; the Transparent box still removes it |
 
 Screenshots and exported files from the last run are written to `test/out/` (ignored by git).

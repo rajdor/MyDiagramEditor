@@ -171,7 +171,9 @@ function getHandles() {
   const out = [], z = S.zoom, c = singleSel();
   if (!c) return out;
   if (S.editPoints === c.id) {
-    getPoints(c).forEach((p, i) => { const q = constraintPoint(c, p); out.push({ type: 'cpoint', i, x: q.x, y: q.y }); });
+    // a point too close to its neighbours to be offered at this zoom is still shown, faded
+    const k = (p) => round3(p[0]) + ',' + round3(p[1]), off = new Set(offeredPoints(c).map(k));
+    workingPoints(c).forEach((p, i) => { const q = constraintPoint(c, p); out.push({ type: 'cpoint', i, x: q.x, y: q.y, hid: !off.has(k(p)) }); });
     return out;
   }
   if (!c.e && !c.isEdgeLabel && !isLocked(c)) {
@@ -258,7 +260,7 @@ function renderOverlay() {
     else if (h.type === 'addwp') el('circle', { cx: h.x, cy: h.y, r: 3.5 * sw, fill: '#fff', stroke: '#2563eb', 'stroke-width': 1.2 * sw, opacity: 0.85 }, ov);
     else if (h.type === 'cpoint') {
       const on = S.selPoint === h.i;
-      el('circle', { cx: h.x, cy: h.y, r: (on ? 6 : 5) * sw, fill: on ? '#f59e0b' : '#fff', stroke: on ? '#b45309' : '#2563eb', 'stroke-width': 1.5 * sw }, ov);
+      el('circle', { cx: h.x, cy: h.y, r: (on ? 6 : 5) * sw, fill: on ? '#f59e0b' : '#fff', stroke: on ? '#b45309' : '#2563eb', 'stroke-width': 1.5 * sw, opacity: h.hid && !on ? 0.4 : null, 'stroke-dasharray': h.hid && !on ? `${2 * sw} ${2 * sw}` : null }, ov);
     }
   }
   // connection points of hovered shape
@@ -398,12 +400,14 @@ function densityPoints(c) {
   along([0, ty], [1, ty], c.w * z); along([1, ty], [1, 1], c.h * (1 - ty) * z); along([0, 1], [1, 1], c.w * z); along([0, ty], [0, 1], c.h * (1 - ty) * z);
   return out;
 }
+/* The points Edit points works on. They are the same points a line can attach to: a shape's own points once they have
+   been changed, otherwise the points worked out from its size on screen. Editing so starts from exactly what is
+   offered, and the first change stores that set with the change made (BUG-002). */
+function workingPoints(c) { const stored = getPoints(c); return samePointSet(stored, defaultPoints(c)) ? densityPoints(c) : stored; }
 function offeredPoints(c) {
   const z = S.zoom;
   if (Math.min(c.w, c.h) * z < POINT_MIN_SHAPE) return [];
-  const stored = getPoints(c);
-  const custom = !samePointSet(stored, defaultPoints(c));
-  const cand = custom ? stored : densityPoints(c);
+  const cand = workingPoints(c);
   // priority: side middles and corners first, so they survive thinning on small shapes
   const pri = (p) => (Math.abs(p[0] - 0.5) < 0.01 || Math.abs(p[1] - 0.5) < 0.01) ? 0 : ((p[0] === 0 || p[0] === 1) && (p[1] === 0 || p[1] === 1) ? 1 : 2);
   const order = cand.map((p, i) => ({ p, i })).sort((a, b) => pri(a.p) - pri(b.p) || a.i - b.i);
@@ -596,7 +600,7 @@ function onPointerDown(ev) {
   svg.setPointerCapture(ev.pointerId);
   if (h) return startHandleDrag(h, w, ev, pre);
   // new line from a hovered connection point
-  if (S.hoverPoint && !S.editPoints) {
+  if (S.hoverPoint && S.editPoints !== S.hoverPoint.id) {
     const c = cellById(S.hoverPoint.id);
     if (c) {
       const e = makeEdge(S.doc.mode); e.source = c.id; e.style.exitX = String(S.hoverPoint.rel[0]); e.style.exitY = String(S.hoverPoint.rel[1]); e.style.exitDx = '0'; e.style.exitDy = '0';
@@ -612,7 +616,7 @@ function onPointerDown(ev) {
     if (c) {
       const lw = rot(w, cellCenter(c), -cellRot(c)), n = nearestOnPoly(outlineLocal(c), lw, true);
       if (n.d <= 8 / S.zoom) {
-        mutate(() => { const pts = getPoints(c); pts.push([round3((n.pt.x - c.x) / c.w), round3((n.pt.y - c.y) / c.h)]); setPoints(c, pts); S.selPoint = pts.length - 1; });
+        mutate(() => { const pts = workingPoints(c); pts.push([round3((n.pt.x - c.x) / c.w), round3((n.pt.y - c.y) / c.h)]); setPoints(c, pts); S.selPoint = pts.length - 1; });
         S.drag = null; return;
       }
     }
@@ -667,7 +671,7 @@ function startHandleDrag(h, w, ev, pre) {
     S.drag = { type: 'seg', id: c.id, i: h.i, horiz: h.horiz, split: ev.shiftKey, pre, start: w, base: r.pts.map(p => ({ x: p.x, y: p.y })) };
   } else if (h.type === 'addwp') {
     S.drag = { type: 'addwp', id: c.id, h, pre, start: w };
-  } else if (h.type === 'cpoint') { S.selPoint = h.i; S.drag = { type: 'cpoint', id: c.id, i: h.i, pre, start: w, old: getPoints(c)[h.i].slice() }; requestRender(); }
+  } else if (h.type === 'cpoint') { S.selPoint = h.i; S.drag = { type: 'cpoint', id: c.id, i: h.i, pre, start: w, old: workingPoints(c)[h.i].slice() }; requestRender(); }
 }
 function onPointerMove(ev) {
   const w = toWorld(ev);
@@ -682,7 +686,7 @@ function onPointerMove(ev) {
     let near = hv;
     if (!near && S.hover) { const pc = cellById(S.hover); if (pc && isConnectable(pc)) { hp = hoverPointAt(pc, w); if (hp) near = pc; } }
     const changed = (S.hover !== (near ? near.id : null)) || JSON.stringify(S.hoverPoint && [S.hoverPoint.id, S.hoverPoint.i]) !== JSON.stringify(hp && [hp.id, hp.i]);
-    S.hover = near ? near.id : null; S.hoverPoint = S.editPoints || S.clean ? null : hp;
+    S.hover = near ? near.id : null; S.hoverPoint = S.clean || (hp && S.editPoints === hp.id) ? null : hp; // the shape being edited shows its edit handles instead
     const hh = hitHandle(w);
     $('#svg').style.cursor = hh ? handleCursor(hh) : (S.hoverPoint ? 'crosshair' : (c ? 'move' : (hitGuide(w) >= 0 && !page().guidesLocked ? (page().guides[hitGuide(w)].o === 'h' ? 'ns-resize' : 'ew-resize') : 'default')));
     if (changed) requestRender();
@@ -773,7 +777,7 @@ function onPointerMove(ev) {
     const c = cellById(d.id), lw = rot(w, cellCenter(c), -cellRot(c));
     const n = nearestOnPoly(outlineLocal(c), lw, true);
     const rel = [round3((n.pt.x - c.x) / c.w), round3((n.pt.y - c.y) / c.h)];
-    const pts = getPoints(c), old = pts[d.i]; pts[d.i] = rel; setPoints(c, pts);
+    const pts = workingPoints(c), old = pts[d.i]; pts[d.i] = rel; setPoints(c, pts);
     repointEdges(c, old, rel); requestRender(); return;
   }
   if (d.type === 'guide') {
@@ -940,7 +944,7 @@ function onDblClick(ev) {
   if (hit.e) {
     const r = S.routes.get(hit.id); const n = nearestOnPoly(routePolyline(r), w, false);
     let lbl;
-    mutate(() => { lbl = makeEdgeLabel(hit, '', round3(n.frac * 2 - 1), { x: 0, y: 0 }); if (S.doc.mode !== 'outline') styleNewCell(lbl, S.doc.mode); page().cells.splice(page().cells.indexOf(hit) + 1, 0, lbl); S.sel = [lbl.id]; });
+    mutate(() => { lbl = makeEdgeLabel(hit, '', round3(n.frac * 2 - 1), { x: 0, y: 0 }); if (S.doc.mode !== 'outline') styleNewCell(lbl, S.doc.mode); newLabelBackground(lbl); page().cells.splice(page().cells.indexOf(hit) + 1, 0, lbl); S.sel = [lbl.id]; });
     startEdit(cellById(lbl.id), true); return;
   }
   let target = hit;
@@ -1027,7 +1031,7 @@ function finishEdit(cancel) {
 
 /* ---------- connection point helpers ---------- */
 function removeConnectionPoint(c, i) {
-  mutate(() => { const pts = getPoints(c); pts.splice(i, 1); setPoints(c, pts); reattachToNearest(c); S.selPoint = null; });
+  mutate(() => { const pts = workingPoints(c); pts.splice(i, 1); setPoints(c, pts); reattachToNearest(c); S.selPoint = null; });
 }
 function resetConnectionPoints(c) {
   mutate(() => { setPoints(c, defaultPoints(c)); reattachToNearest(c); S.selPoint = null; });

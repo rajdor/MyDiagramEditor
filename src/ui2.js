@@ -689,9 +689,16 @@ function zOrder(front) {
   });
 }
 function toggleEditPoints(c) { S.editPoints = S.editPoints === c.id ? null : c.id; S.selPoint = null; buildFormat(); requestRender(); }
+/* A label added to a line by hand starts with a background in the canvas colour, in every style, so the line does not
+   run through its words. The Transparent box in the Text section removes it. Labels restyled with a whole diagram
+   keep that style's own rule (Blueprint and Neon: no background). */
+function newLabelBackground(lbl) {
+  if (sv(lbl.style, 'labelBackgroundColor', '#ffffff') !== 'none') return;
+  const bg = pageBackground(page()); lbl.style.labelBackgroundColor = hexRgb(bg) ? bg : '#ffffff';
+}
 function addLabelToEdge(e) {
   let lbl;
-  mutate(() => { const n = page().cells.filter(c => c.isEdgeLabel && c.parent === e.id).length; lbl = makeEdgeLabel(e, '', [0, -0.5, 0.5, -0.25, 0.25][n % 5], { x: 0, y: 0 }); if (S.doc.mode !== 'outline') styleNewCell(lbl, S.doc.mode); page().cells.splice(page().cells.indexOf(e) + 1, 0, lbl); S.sel = [lbl.id]; });
+  mutate(() => { const n = page().cells.filter(c => c.isEdgeLabel && c.parent === e.id).length; lbl = makeEdgeLabel(e, '', [0, -0.5, 0.5, -0.25, 0.25][n % 5], { x: 0, y: 0 }); if (S.doc.mode !== 'outline') styleNewCell(lbl, S.doc.mode); newLabelBackground(lbl); page().cells.splice(page().cells.indexOf(e) + 1, 0, lbl); S.sel = [lbl.id]; });
   startEdit(cellById(lbl.id), true);
 }
 function selectedOrAllEdges() { const s = selCells().filter(c => c.e); return s.length ? s : page().cells.filter(c => c.e); }
@@ -971,12 +978,12 @@ function formatGeometry(c) {
 }
 function formatPoints(c) {
   const s = fsec('Connection points');
-  const n = getPoints(c).length;
+  const n = workingPoints(c).length, faded = S.editPoints === c.id ? n - offeredPoints(c).length : 0;
   const r = frow(s);
   r.appendChild(mkBtn(S.editPoints === c.id ? 'Done' : 'Edit points', () => toggleEditPoints(c), S.editPoints === c.id ? 'on' : ''));
   r.appendChild(mkBtn('Reset to defaults', () => resetConnectionPoints(c)));
   const h = document.createElement('p'); h.className = 'hint';
-  h.textContent = n + ' points. ' + (S.editPoints === c.id ? 'Click the outline to add a point, drag a point along the outline to move it, select one and press Delete (or double-click it) to remove it.' : 'Lines attached to a point follow it when it moves.');
+  h.textContent = n + ' points. ' + (S.editPoints === c.id ? 'Click the outline to add a point, drag a point along the outline to move it, select one and press Delete (or double-click it) to remove it. These are the points a line can attach to.' + (faded > 0 ? ' ' + faded + (faded === 1 ? ' is' : ' are') + ' too close to others to use at this zoom (shown faded); zoom in to use ' + (faded === 1 ? 'it.' : 'them.') : '') : 'Lines attached to a point follow it when it moves.');
   s.appendChild(h);
 }
 function formatArrange(cs) {

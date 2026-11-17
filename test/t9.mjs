@@ -13,7 +13,7 @@ await pg.screenshot({ path: 'test/out/s_selshape.png' });
 // edit connection points
 await pg.evaluate(() => { const btn = Array.from(document.querySelectorAll('#format .btn')).find(b => b.textContent === 'Edit points'); btn.click(); });
 await sleep(200);
-p = await scr(160 + 30, 160); // top edge at 0.25 -> drag along to 0.1
+p = await scr(160 + 20, 160); // top edge at 0.167, a point offered at this zoom -> drag along to 0.1
 const q = await scr(160 + 12, 160);
 await pg.mouse.move(p.x, p.y); await pg.mouse.down(); await pg.mouse.move(q.x, q.y, { steps: 5 }); await pg.mouse.up(); await sleep(100);
 // click outline to add a point at bottom 0.6

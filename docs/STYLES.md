@@ -147,7 +147,7 @@ Options: **Also switch the canvas to dark navy?** (default Yes when the canvas i
 | Grey shapes | Dominant colour, or cyan if none |
 | Containers | Glowing outline, 4% wash |
 | Text | Light on a dark canvas, dark on a light one; text does not glow |
-| Line labels | Background boxes removed |
+| Line labels | Background boxes removed. A label you add to a line afterwards starts with a background in the canvas colour (Text, Transparent removes it) |
 | Lines | Bright colour, at least 2 px, glowing |
 | Icons | Outline weight, bright colour, glowing |
 
@@ -197,7 +197,7 @@ Blueprint has one ink. Existing colour coding is replaced; colour comes back onl
 | Shapes | Fill `#EAF1F8`, outline navy `#12355B` 1.5 px, corner radius 3 px (rectangles; pills such as terminators keep their rounding), Architects Daughter, navy, bold, 22 px with sizes on. Shadow 2 px right, 3 px down, navy at 20%, no blur, with shadows on |
 | Containers | No fill, dashed soft-ink outline `#3D5A7A`, label soft ink 17 px top left, no shadow |
 | Lines | Navy 2.5 px, round caps and joins, filled triangle head. Straight lines without waypoints become elbows; curved and waypoint routes are kept. Crow's foot ends are kept, and a start arrow stays a (filled) start arrow |
-| Line labels | Soft ink, 17 px, no background, moved 8 px clear of the line (above a horizontal line, right of a vertical one) unless you already moved them |
+| Line labels | Soft ink, 17 px, no background, moved 8 px clear of the line (above a horizontal line, right of a vertical one) unless you already moved them. A label you add to a line afterwards starts with a background in the canvas colour (Text, Transparent removes it) |
 | Text | Architects Daughter, navy; size kept, but never below 17 px with sizes on |
 | Icons | Phosphor Regular, navy |
 | Harvey balls | Navy outline and wedge, white ring |
