@@ -7,6 +7,8 @@
 - BUG-002: the points shown by Edit points are now the points a line can attach to. A shape with its default points used to show its stored points in Edit points but offer a different, size-based set on hover, so some points could not be used until one was edited. Edit points now starts from the points offered; a point too crowded to offer at the current zoom is shown faded; other shapes stay connectable while one is being edited
 
 ### Changes
+- Sketch style: hatching is lighter. Hatch lines in a pale fill used to be drawn 45 percent of the way toward the outline colour, which made hatched shapes look heavy. They are now deepened only as much as the fill is pale: not at all below a luminance of 0.7, and about a quarter of the way for white. Mid and dark fills are unchanged.
+- Embed mode: a new `de:render` message. The host sends a diagram and gets back its picture (`de:rendered`, with the same SVG a Done gives) without the editor opening it; the diagram on screen, its undo history and embed mode are untouched. See [docs/EMBED.md](docs/EMBED.md).
 - A label added to a line by hand (Add label, or a double-click on the line) now starts with a background in the canvas colour in every style, including Blueprint and Neon, so the line does not run through its words. Text, Transparent removes it. Labels restyled with a whole diagram keep the style's own rule
 
 ### Tests

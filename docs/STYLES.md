@@ -134,7 +134,7 @@ Options: **Override existing colours?** (default Yes); **Scheme:** Monochromatic
 
 Options: **Fill style:** Hachure (default), Transparent (outlines only; removes fills), Solid, Cross-hatch, Zigzag, Dots, Dashed; **Roughness:** Subtle, Normal (default, matched to the reference whiteboard image), Rough; **Override font?** (default Yes, Architects Daughter).
 
-Colours are unchanged. Shapes, lines and icons are drawn by hand. Containers keep a solid fill (hatching a whole container is too busy). Very pale fills are hatched in a slightly deeper shade so the lines show; draw.io hatches in the fill colour as is. Loss: fonts are replaced when Override font = Yes.
+Colours are unchanged. Shapes, lines and icons are drawn by hand. Containers keep a solid fill (hatching a whole container is too busy). Pale fills are hatched in a slightly deeper shade, toward the outline colour, so the lines show: the paler the fill, the deeper (none at all below a luminance of 0.7, about a quarter of the way for white); draw.io hatches in the fill colour as is. Loss: fonts are replaced when Override font = Yes.
 
 ### 4. Outline to Neon
 

@@ -67,5 +67,6 @@ Only checks that do not depend on installed fonts are in baselines, so they pass
 | t44 | **Text size while editing** (BUG-001): Size through the real input changes only the selected words, keeps the selection and editing, a caret sizes the whole label, Font and Bold still format the selection; standalone and in embed mode |
 | t45 | **Edit points and hover agree** (BUG-002): Edit points shows exactly the points offered on hover; a point added, moved or removed is offered at once; a line can be drawn from and to an added point; other shapes stay connectable while one is edited, and dragging from one ends the editing; crowded points are faded; Reset to defaults |
 | t46 | **New line labels have a background**: a label added by the Add label command or by double-clicking a line starts with the canvas colour in all six styles; labels restyled with the diagram keep the style's rule; the Transparent box still removes it |
+| t47 | **Render for the host, and hatch colour**: `de:render` answers with an SVG holding the labels and title, the size and the source, each answer with its id and its own ids, an error for bad XML, nothing from other senders, and the editor unchanged; pale fills are hatched a little deeper, white clearly deeper, mid fills as they are |
 
 Screenshots and exported files from the last run are written to `test/out/` (ignored by git).

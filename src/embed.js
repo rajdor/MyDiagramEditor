@@ -5,6 +5,8 @@
      editor -> host  { type: 'de:save', xml, svg, width, height, title }    Done
      editor -> host  { type: 'de:cancel' }                                  Cancel
      editor -> host  { type: 'de:dirty', dirty }                            unsaved-change flag changed
+     host -> editor  { type: 'de:render', xml, title, id }                  draw this diagram and send the picture back; nothing is shown or loaded
+     editor -> host  { type: 'de:rendered', id, xml, svg, width, height }   the answer to de:render (or { id, error })
    Only messages whose source is window.parent are accepted. The host may be a file:// or srcdoc page (origin "null"),
    so the source is checked, not the origin, and replies go to '*'. The editor runs normally until a de:init arrives. */
 const EMBED = { inFrame: (() => { try { return window.parent !== window; } catch (e) { return true; } })(), title: '', lastDirty: null, seq: 0 };
@@ -18,8 +20,20 @@ function embedStart() {
 function onEmbedMessage(ev) {
   if (ev.source !== window.parent) return;
   const m = ev.data;
-  if (!m || typeof m !== 'object' || m.type !== 'de:init') return;
-  embedLoad(m);
+  if (!m || typeof m !== 'object') return;
+  if (m.type === 'de:render') embedRender(m); else if (m.type === 'de:init') embedLoad(m);
+}
+/* Draw a diagram for the host without opening it: the diagram on screen, its undo history and embed mode are untouched. */
+async function embedRender(m) {
+  const id = typeof m.id === 'string' || typeof m.id === 'number' ? m.id : null;
+  try {
+    const xml = typeof m.xml === 'string' ? m.xml : '';
+    if (!xml.trim() || xml.length > MAX_FILE_BYTES) throw new Error('No diagram was given, or it is too large.');
+    const doc = await parseDrawio(xml), title = (typeof m.title === 'string' ? m.title.slice(0, 200) : '') || doc.pages[0].name;
+    const prefix = 'de' + Date.now().toString(36) + (++EMBED.seq).toString(36) + Math.random().toString(36).slice(2, 6) + '-';
+    const ex = buildExportSvg(doc.pages[0], { fonts: false, idPrefix: prefix, title });
+    embedPost({ type: 'de:rendered', id, xml: serializeDoc(doc), svg: ex.svg, width: ex.w, height: ex.h });
+  } catch (e) { embedPost({ type: 'de:rendered', id, error: String((e && e.message) || e) }); }
 }
 async function embedLoad(m) {
   if (S.editing) finishEdit(true);

@@ -13,6 +13,8 @@ Messages use `postMessage`. Nothing touches the network, and the Content Securit
 | editor to host | `{ type: 'de:save', xml, svg, width, height, title }` | The user pressed Done. `xml` is the whole diagram; `svg` is the current page |
 | editor to host | `{ type: 'de:cancel' }` | The user pressed Cancel (after confirming, if there were changes) |
 | editor to host | `{ type: 'de:dirty', dirty }` | The unsaved-change flag changed, so the host can warn on close |
+| host to editor | `{ type: 'de:render', xml, title, id }` | Draw this diagram and send the picture back. Nothing is shown or loaded: the diagram on screen, its undo history and embed mode are untouched. `id` is returned with the answer so the host can match it |
+| editor to host | `{ type: 'de:rendered', id, xml, svg, width, height }` | The answer to `de:render`: the same SVG a Done would give. `{ type: 'de:rendered', id, error }` when the XML could not be read |
 
 The editor accepts messages only when `event.source === window.parent`, and replies with `window.parent.postMessage(msg, '*')`. The origin is not checked because a `file://` or `srcdoc` host has the origin `"null"`. A second `de:init` replaces the diagram.
 

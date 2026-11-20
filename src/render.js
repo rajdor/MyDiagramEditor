@@ -187,8 +187,9 @@ function textCss(st) {
     ';font-weight:' + (fs & 1 ? 'bold' : 'normal') + ';font-style:' + (fs & 2 ? 'italic' : 'normal') + ';text-decoration:' + (fs & 4 ? 'underline' : 'none') +
     ';line-height:1.2;' + (sb(st, 'deGlow', false) && lum(colorOr(st, 'fontColor', '#1e293b')) > 0.35 ? 'text-shadow:0 0 4px ' + colorOr(st, 'fontColor', '#1e293b') + ';' : '');
 }
-// Hatch lines in a very pale fill colour are invisible; draw them a little deeper (draw.io uses the fill colour as is).
-function sketchHatch(f, stroke) { return hexRgb(f) && lum(f) > 0.7 ? mixHex(f, hexRgb(stroke) ? stroke : '#475569', 0.45) : f; }
+// Hatch lines in a very pale fill colour are hard to see on white, so they are drawn a little deeper, toward the outline
+// colour: the paler the fill, the more (none below a luminance of 0.7, about a quarter for white). draw.io uses the fill colour as is.
+function sketchHatch(f, stroke) { if (!hexRgb(f)) return f; const t = Math.min(0.3, Math.max(0, (lum(f) - 0.7) * 0.9)); return t ? mixHex(f, hexRgb(stroke) ? stroke : '#475569', t) : f; }
 function withAlpha(hex, a) { const r = hexRgb(hex); return !r || a >= 1 ? hex : 'rgba(' + r.join(',') + ',' + a + ')'; }
 const GLOW_FILTER = '<filter id="deGlow" filterUnits="userSpaceOnUse" x="-20000" y="-20000" width="40000" height="40000" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b1"/><feGaussianBlur in="SourceGraphic" stdDeviation="1.6" result="b2"/><feMerge><feMergeNode in="b1"/><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="deGlowSoft" filterUnits="userSpaceOnUse" x="-20000" y="-20000" width="40000" height="40000" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="3.5" result="b1"/><feComponentTransfer in="b1" result="b2"><feFuncA type="linear" slope="0.8"/></feComponentTransfer><feMerge><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
 function vertexLabelFO(c, parent) {
