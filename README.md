@@ -23,6 +23,7 @@ A lightweight, Gliffy-style diagram editor in a single, self-contained HTML file
 - Shape palette in groups that expand and collapse (Alt+click a group to show only that group; the layout is remembered), with search across shapes and icons
 - Save and open `.drawio`, Save as, autosave recovery, recent files
 - Export: PNG, SVG, PDF (one page), and a Gliffy compatible `.drawio`
+- Paste from draw.io XML (clipboard), on the Edit menu: adds shapes written as draw.io XML elsewhere, such as draw.io's own Copy or an answer from an AI assistant. A code fence or words around the XML are ignored; if the clipboard cannot be read, a box opens to paste into
 - Embed mode: a host page can open the editor in an iframe, pass it a diagram and get back draw.io XML and an inline-ready SVG (`postMessage`, no network). The same file works standalone. Details: [docs/EMBED.md](docs/EMBED.md)
 
 ## Compatibility notes
