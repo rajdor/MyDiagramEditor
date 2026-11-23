@@ -11,6 +11,7 @@
 
 ### Fixes
 - Font and Size with mixed text: with shapes whose fonts or sizes differ, the Font list and Size box show Mixed, so any font or size chosen applies. While a label is edited they follow the selected words, showing Mixed when the words differ. They used to show the first shape's font, so choosing that font did nothing until another font was chosen first.
+- Text alignment in labels: the Position grid's left, centre and right now always apply. Alignment that came inside the label's text (usually pasted in) used to override it, so centre and right did nothing for that text on the canvas, while the exported picture used the grid's setting. Diagrams that already hold such text follow the grid now.
 - Line spacing in labels: lines are always 1.2 times their own text size. A label holding a fixed line height (usually pasted in from a web page, Word or an AI assistant) used to keep it when its text was made larger, so the lines overlapped on the canvas while the exported picture spaced them correctly. Diagrams that already hold such a line height are drawn correctly now, with nothing to redo.
 - Text pasted into a label takes the label's own font, size and colour. The font, size, colour, background and line spacing that came with it are dropped; bold, italic, underline, lists and line breaks stay, and a pasted heading becomes a bold line. Ctrl+Shift+V still pastes plain text.
 - Ctrl+C, Ctrl+X and Ctrl+V use the browser's own copy, cut and paste. Copied shapes go to the system clipboard as draw.io XML with no permission asked, so they paste into another diagram in another document or tab, or into draw.io; draw.io XML copied anywhere else pastes in as shapes. What was last copied here still pastes from the editor's own copy, with every detail and stepped aside each time. Ctrl+V used to paste only shapes copied in the same editor, and the system clipboard was written only when the browser allowed it. In a text box the keys copy and paste text as before.
@@ -25,7 +26,7 @@
 
 ### Tests
 - t53: Font and Size show Mixed for shapes and for selected words that differ, and the font shown can be chosen
-- t52: line spacing with a fixed line height, and text pasted into a label
+- t52: line spacing with a fixed line height, alignment carried in a label's text, and text pasted into a label
 - t51: Arrange: panel buttons, Same width and align left, Same height and align top, the shape that sets the size, several shapes resized together
 - t50: Copy and paste style (what goes across and what stays, word colours, shape to line, locked shapes, one undo, keys, the painter, menus) and the colour panel (preview, Cancel, Esc, click elsewhere, hex, OK as one undo, selected words while editing); t41 picks a colour through the panel
 - t49: Clipboard keys: XML from the system clipboard in one undo step, copy and cut to the system clipboard, a paste after a copy uses the editor's own copy stepped aside, other words on the clipboard, text boxes unaffected
