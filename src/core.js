@@ -255,6 +255,7 @@ function safeCss(css) {
     const i = d.indexOf(':'); if (i < 1) return false;
     const prop = d.slice(0, i).trim().toLowerCase(), val = d.slice(i + 1).toLowerCase();
     if (!/^-?[a-z-]+$/.test(prop) || /^(position|behavior|-moz-binding|content|cursor|mask|filter)/.test(prop)) return false;
+    if (prop === 'line-height') return false; // a label's lines are always 1.2 of their own text size, as the exported picture draws them; a fixed line height (often pasted in) made larger words overlap
     return !/url\s*\(|expression|image-set|@import|javascript:|[<>{}\\]/.test(val); // a backslash could hide any of these as a CSS escape
   }).join(';');
 }

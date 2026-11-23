@@ -167,9 +167,21 @@ const H_R = 5;
 function selCells() { return S.sel.map(id => cellById(id)).filter(Boolean); }
 function singleSel() { const s = selCells(); return s.length === 1 ? s[0] : null; }
 function isLocked(c) { return c && sb(c.style, 'locked', false); }
+// Shapes that can be resized together: two or more selected, unlocked, not lines, labels or groups.
+function multiResizable() { const cs = selCells(); if (cs.length < 2) return []; return topUnits(cs).filter(c => !c.e && !c.isEdgeLabel && !isGroup(c) && !isLocked(c)); }
+function resizeHandles(c, out, id) {
+  const z = S.zoom, r = cellRot(c), cc = cellCenter(c);
+  const pos = { nw: [0, 0], n: [0.5, 0], ne: [1, 0], e: [1, 0.5], se: [1, 1], s: [0.5, 1], sw: [0, 1], w: [0, 0.5] };
+  for (const k in pos) {
+    if (c.w * z < 24 && k.length === 1) continue;
+    const off = 9 / z, ox = (pos[k][0] - 0.5) * 2 * off, oy = (pos[k][1] - 0.5) * 2 * off;
+    const p = rot({ x: c.x + pos[k][0] * c.w + ox, y: c.y + pos[k][1] * c.h + oy }, cc, r);
+    out.push({ type: 'resize', dir: k, x: p.x, y: p.y, id });
+  }
+}
 function getHandles() {
   const out = [], z = S.zoom, c = singleSel();
-  if (!c) return out;
+  if (!c) { if (!S.editPoints) for (const m of multiResizable()) resizeHandles(m, out, m.id); return out; }
   if (S.editPoints === c.id) {
     // a point too close to its neighbours to be offered at this zoom is still shown, faded
     const k = (p) => round3(p[0]) + ',' + round3(p[1]), off = new Set(offeredPoints(c).map(k));
@@ -178,13 +190,7 @@ function getHandles() {
   }
   if (!c.e && !c.isEdgeLabel && !isLocked(c)) {
     const r = cellRot(c), cc = cellCenter(c);
-    const pos = { nw: [0, 0], n: [0.5, 0], ne: [1, 0], e: [1, 0.5], se: [1, 1], s: [0.5, 1], sw: [0, 1], w: [0, 0.5] };
-    for (const k in pos) {
-      if (c.w * z < 24 && k.length === 1) continue;
-      const off = 9 / z, ox = (pos[k][0] - 0.5) * 2 * off, oy = (pos[k][1] - 0.5) * 2 * off;
-      const p = rot({ x: c.x + pos[k][0] * c.w + ox, y: c.y + pos[k][1] * c.h + oy }, cc, r);
-      out.push({ type: 'resize', dir: k, x: p.x, y: p.y });
-    }
+    resizeHandles(c, out);
     const rp = rot({ x: cc.x, y: c.y - 32 / z }, cc, r);
     out.push({ type: 'rotate', x: rp.x, y: rp.y, line: rot({ x: cc.x, y: c.y - 9 / z }, cc, r) });
   }
@@ -265,7 +271,7 @@ function renderOverlay() {
   }
   // connection points of hovered shape
   const hv = S.hover && cellById(S.hover);
-  if (hv && isConnectable(hv) && S.editPoints !== hv.id && !(S.drag && ['move', 'resize', 'rotate', 'marquee', 'pan'].includes(S.drag.type))) {
+  if (hv && isConnectable(hv) && S.editPoints !== hv.id && !(S.drag && ['move', 'resize', 'mresize', 'rotate', 'marquee', 'pan'].includes(S.drag.type))) {
     offeredPoints(hv).forEach((p, i) => {
       const q = constraintPoint(hv, p), active = S.hoverPoint && S.hoverPoint.id === hv.id && S.hoverPoint.i === i;
       const s = (active ? 5 : 3.5) * sw;
@@ -433,7 +439,8 @@ function selectionUnit(c) {
   for (const x of chain) if (S.sel.includes(x.id)) return x;
   return chain[0];
 }
-function setSel(ids) { S.sel = ids.slice(); S.selPoint = null; if (S.editPoints && !S.sel.includes(S.editPoints)) S.editPoints = null; if (ids.length) S.selGuides = []; buildFormat(); requestRender(); }
+function setSelAuto(ids) { setSel(ids); S.selAuto = ids.length > 1; buildFormat(); }   // a selection with no first click: by drag box or Select all
+function setSel(ids) { S.selAuto = false; S.sel = ids.slice(); S.selPoint = null; if (S.editPoints && !S.sel.includes(S.editPoints)) S.editPoints = null; if (ids.length) S.selGuides = []; buildFormat(); requestRender(); }
 
 /* ---------- snapping ---------- */
 function snapVal(v, gs) { return Math.round(v / gs) * gs; }
@@ -638,6 +645,7 @@ function onPointerDown(ev) {
     }
   }
   S.selGuides = [];
+  if (S.painter && ev.button === 0) { if (hit) paintAt(hit.isEdgeLabel ? hit : selectionUnit(hit)); else paintEnd(); S.drag = null; return; }   // the style painter: the shape clicked takes the style
   if (hit) {
     let unit = hit.isEdgeLabel ? hit : selectionUnit(hit);
     if (ev.shiftKey || ev.metaKey || ev.ctrlKey) {
@@ -661,6 +669,7 @@ function onPointerDown(ev) {
   requestRender();
 }
 function startHandleDrag(h, w, ev, pre) {
+  if (h.type === 'resize' && h.id) { const ms = multiResizable(); S.drag = { type: 'mresize', lead: h.id, dir: h.dir, pre, start: w, items: ms.map(m => ({ id: m.id, o: { x: m.x, y: m.y, w: m.w, h: m.h } })) }; return; }
   const c = singleSel();
   if (h.type === 'resize') S.drag = { type: 'resize', id: c.id, dir: h.dir, pre, start: w, o: { x: c.x, y: c.y, w: c.w, h: c.h }, origin: captureOrigin([c]) };
   else if (h.type === 'rotate') S.drag = { type: 'rotate', id: c.id, pre, start: w, r0: cellRot(c), a0: Math.atan2(w.y - cellCenter(c).y, w.x - cellCenter(c).x), origin: captureOrigin([c]), center: cellCenter(c) };
@@ -715,6 +724,7 @@ function onPointerMove(ev) {
     requestRender(); return;
   }
   if (d.type === 'resize') { doResize(d, w, ev); return; }
+  if (d.type === 'mresize') { doMultiResize(d, w, ev); return; }
   if (d.type === 'rotate') {
     const c = cellById(d.id); let a = (Math.atan2(w.y - d.center.y, w.x - d.center.x) - d.a0) * 180 / Math.PI;
     let r = d.r0 + a; if (!alt) r = Math.round(r / 15) * 15; r = ((r % 360) + 360) % 360;
@@ -805,7 +815,7 @@ function onPointerUp(ev) {
         const b = c.e ? (S.routes.get(c.id) ? bboxOf(S.routes.get(c.id).pts) : null) : worldBox(c);
         if (b && b.x >= m.x && b.y >= m.y && b.x + b.w <= m.x + m.w && b.y + b.h <= m.y + m.h) ids.add(selectionUnitTop(c).id);
       }
-      setSel(Array.from(ids));
+      if (d.add.length) setSel(Array.from(ids)); else setSelAuto(Array.from(ids));
     } else requestRender();
     return;
   }
@@ -839,7 +849,7 @@ function onPointerUp(ev) {
 }
 function selectionUnitTop(c) { const anc = ancestors(c).filter(isGroup); return anc.length ? anc[0] : c; }
 function handleCursor(h) {
-  if (h.type === 'resize') { const c = singleSel(); const base = { n: 0, ne: 45, e: 90, se: 135, s: 180, sw: 225, w: 270, nw: 315 }[h.dir] + (c ? cellRot(c) : 0); const k = Math.round((((base % 180) + 180) % 180) / 45) % 4; return ['ns-resize', 'nesw-resize', 'ew-resize', 'nwse-resize'][k]; }
+  if (h.type === 'resize') { const c = h.id ? cellById(h.id) : singleSel(); const base = { n: 0, ne: 45, e: 90, se: 135, s: 180, sw: 225, w: 270, nw: 315 }[h.dir] + (c ? cellRot(c) : 0); const k = Math.round((((base % 180) + 180) % 180) / 45) % 4; return ['ns-resize', 'nesw-resize', 'ew-resize', 'nwse-resize'][k]; }
   if (h.type === 'rotate') return 'grab';
   if (h.type === 'seg') return h.horiz ? 'ns-resize' : 'ew-resize';
   return 'pointer';
@@ -881,6 +891,40 @@ function reattachToNearest(c) {
       e.style[pfx + 'X'] = String(best[0]); e.style[pfx + 'Y'] = String(best[1]);
     }
   }
+}
+/* Several shapes resized together, as PowerPoint does: the handle dragged sets how much the shape it belongs to changes,
+   and every selected shape changes by that same amount, each from its own opposite side or corner, so places and gaps stay
+   and shapes of one width stay one width. Shift keeps each shape's own proportions. */
+function doMultiResize(d, w, ev) {
+  const L = d.items.find(i => i.id === d.lead), lc = cellById(d.lead); if (!L || !lc) return;
+  const box = resizedBox(L.o, cellRot(lc), d.dir, w, ev);
+  const dw = box.w - L.o.w, dh = box.h - L.o.h, dir = d.dir;
+  for (const it of d.items) {
+    const c = cellById(it.id); if (!c) continue;
+    const o = it.o, r = cellRot(c);
+    let nw = dir.includes('e') || dir.includes('w') ? Math.max(10, o.w + dw) : o.w, nh = dir.includes('n') || dir.includes('s') ? Math.max(10, o.h + dh) : o.h;
+    if (ev.shiftKey && dir.length === 2) nh = Math.max(10, nw * o.h / o.w);
+    let x0 = o.x, y0 = o.y;
+    if (dir.includes('w')) x0 = o.x + o.w - nw; if (dir.includes('n')) y0 = o.y + o.h - nh;
+    const cc0 = { x: o.x + o.w / 2, y: o.y + o.h / 2 }, wc = rot({ x: x0 + nw / 2, y: y0 + nh / 2 }, cc0, r);
+    c.x = round2(wc.x - nw / 2); c.y = round2(wc.y - nh / 2); c.w = round2(nw); c.h = round2(nh);
+  }
+  setStatus('W ' + Math.round(box.w) + '  H ' + Math.round(box.h) + '  (' + d.items.length + ' shapes)');
+  requestRender();
+}
+// The box a shape gets when the handle dir is dragged to w: snapping, the 10 px minimum and Shift for proportions.
+function resizedBox(o, r, dir, w, ev) {
+  const cc0 = { x: o.x + o.w / 2, y: o.y + o.h / 2 }, lw = rot(w, cc0, -r), off = 9 / S.zoom;
+  let x0 = o.x, y0 = o.y, x1 = o.x + o.w, y1 = o.y + o.h;
+  let px = lw.x - (dir.includes('w') ? -off : dir.includes('e') ? off : 0), py = lw.y - (dir.includes('n') ? -off : dir.includes('s') ? off : 0);
+  if (!r && !ev.altKey) { const sp = snapPoint({ x: px, y: py }, false); px = sp.x; py = sp.y; }
+  if (dir.includes('w')) x0 = Math.min(px, x1 - 10); if (dir.includes('e')) x1 = Math.max(px, x0 + 10);
+  if (dir.includes('n')) y0 = Math.min(py, y1 - 10); if (dir.includes('s')) y1 = Math.max(py, y0 + 10);
+  if (ev.shiftKey && dir.length === 2) {
+    const ar = o.w / o.h, nw = x1 - x0, nh = y1 - y0;
+    if (nw / nh > ar) { const h2 = nw / ar; if (dir.includes('n')) y0 = y1 - h2; else y1 = y0 + h2; } else { const w2 = nh * ar; if (dir.includes('w')) x0 = x1 - w2; else x1 = x0 + w2; }
+  }
+  return { w: x1 - x0, h: y1 - y0 };
 }
 function doResize(d, w, ev) {
   const c = cellById(d.id), o = d.o, r = cellRot(c), alt = ev.altKey;
@@ -971,6 +1015,14 @@ function startEdit(c, isNew) {
     if ((e.ctrlKey || e.metaKey) && ['b', 'i', 'u'].includes(e.key.toLowerCase())) { e.preventDefault(); document.execCommand({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]); }
   });
   ed.addEventListener('input', () => positionEditor(true));
+  // Pasted text takes the label's own font, size and colour: what came with it is dropped, bold, italic, underline, lists and line breaks stay
+  ed.addEventListener('paste', (e) => {
+    const dt = e.clipboardData; if (!dt) return;
+    e.preventDefault(); e.stopPropagation();
+    const h = dt.getData('text/html'), t = dt.getData('text/plain');
+    if (h && h.trim()) { const x = pastePlainLook(h); if (x.trim()) { document.execCommand('insertHTML', false, x); return; } }
+    if (t) document.execCommand('insertText', false, t);
+  });
   const focusAll = () => { ed.focus(); const rg = document.createRange(); rg.selectNodeContents(ed); const s = window.getSelection(); s.removeAllRanges(); s.addRange(rg); };
   focusAll();
   requestRender(); buildFormat();
@@ -981,7 +1033,7 @@ function startEdit(c, isNew) {
 document.addEventListener('selectionchange', () => {
   const E = S.editing; if (!E) return;
   const s = window.getSelection(); if (!s.rangeCount) return;
-  const rg = s.getRangeAt(0); if (E.ed.contains(rg.commonAncestorContainer)) E.range = rg.cloneRange();
+  const rg = s.getRangeAt(0); if (E.ed.contains(rg.commonAncestorContainer)) { E.range = rg.cloneRange(); textSelSync(); }
 });
 // Focus the label and select its remembered range; with wholeIfEmpty, a caret or no range selects the whole label.
 function restoreEditSel(wholeIfEmpty) {
@@ -992,6 +1044,22 @@ function restoreEditSel(wholeIfEmpty) {
   const s = window.getSelection(); s.removeAllRanges(); s.addRange(rg);
 }
 function clearCacheFor(id) { const e = S.cache.get(id); if (e) { e.g.remove(); S.cache.delete(id); } }
+/* HTML pasted into a label, matched to the label: no font, size, colour, background or spacing of its own; headings and
+   paragraphs become lines (a pasted heading is bold), so nothing pasted is larger or further apart than the label's text. */
+function pastePlainLook(html) {
+  const t = document.createElement('template'); t.innerHTML = sanitizeHtml(String(html).replace(/^[\s\S]*<!--StartFragment-->|<!--EndFragment-->[\s\S]*$/g, '')); const r = t.content;
+  r.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(x => { const d = document.createElement('div'), b = document.createElement('b'); b.append(...x.childNodes); d.appendChild(b); x.replaceWith(d); });
+  r.querySelectorAll('p,blockquote,pre').forEach(x => { const d = document.createElement('div'); d.append(...x.childNodes); x.replaceWith(d); });
+  r.querySelectorAll('font').forEach(f => { ['color', 'face', 'size'].forEach(a => f.removeAttribute(a)); if (!f.attributes.length) f.replaceWith(...f.childNodes); });
+  r.querySelectorAll('[style]').forEach(x => {
+    const bold = /^(bold|[6-9]00)$/.test(x.style.fontWeight), it = x.style.fontStyle === 'italic', un = /underline/.test(x.style.textDecorationLine || x.style.textDecoration || '');
+    x.removeAttribute('style'); if (bold) x.style.fontWeight = 'bold'; if (it) x.style.fontStyle = 'italic'; if (un) x.style.textDecoration = 'underline';
+    if (!x.getAttribute('style')) x.removeAttribute('style');
+  });
+  r.querySelectorAll('[align]').forEach(x => x.removeAttribute('align'));
+  r.querySelectorAll('span:not([style])').forEach(x => x.replaceWith(...x.childNodes));
+  const d = document.createElement('div'); d.appendChild(r); return d.innerHTML.replace(/^\s+|\s+$/g, '');
+}
 function positionEditor(keepContent) {
   if (!S.editing) return;
   const c = cellById(S.editing.id); if (!c) return;
@@ -1064,6 +1132,8 @@ function onKeyDown(e) {
     return;
   }
   if ($('#modalRoot').children.length) { if (e.key === 'Escape') closeModal(); return; }
+  if (e.key === 'Escape' && S.painter) { e.preventDefault(); paintEnd(); return; }
+  if (e.altKey && e.shiftKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyC' || e.code === 'KeyV')) { e.preventDefault(); runCommand(e.code === 'KeyC' ? 'copyStyle' : 'pasteStyle'); return; }   // e.code: on a Mac, Option+Shift+C types a character
   const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
   if (e.key === ' ' && !S.space) { S.space = true; $('#svg').style.cursor = 'grab'; e.preventDefault(); return; }
   const run = (id) => { e.preventDefault(); runCommand(id); };
@@ -1071,9 +1141,10 @@ function onKeyDown(e) {
   if ((mod && k === 'y') || (mod && e.shiftKey && k === 'z')) return run('redo');
   if (mod && k === 's') return run(e.shiftKey ? 'saveAs' : 'save');
   if (mod && k === 'o') return run('open');
-  if (mod && k === 'c') return run('copy');
-  if (mod && k === 'x') return run('cut');
-  if (mod && k === 'v') return run('paste');
+  if (mod && !e.shiftKey && !e.altKey && (k === 'c' || k === 'x' || k === 'v')) { // the browser's copy, cut or paste event does the work (ui2.js); the command runs only if none comes
+    S.clipNative = false; const id = k === 'c' ? 'copy' : k === 'x' ? 'cut' : 'paste';
+    setTimeout(() => { if (!S.clipNative) runCommand(id); }, 0); return;
+  }
   if (mod && k === 'd') return run('duplicate');
   if (mod && k === 'a') return run('selectAll');
   if (mod && k === 'g') return run(e.shiftKey ? 'ungroup' : 'group');

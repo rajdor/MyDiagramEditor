@@ -217,3 +217,18 @@ kbd { background: var(--chrome); border: 1px solid var(--line); border-bottom-wi
 .contrastDlg .ctab tr.bad td { color: var(--danger); }
 .contrastDlg code { font-size: 11px; }
 .csw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line); vertical-align: -3px; margin-right: 4px; }
+
+/* colour button and its panel */
+.colorBtn { width: 30px; height: 26px; border: 1px solid var(--fieldLine); border-radius: var(--radiusSm); padding: 3px; background: var(--field); cursor: pointer; }
+.colorBtn::before { content: ''; display: block; width: 100%; height: 100%; border-radius: 2px; background: var(--c, #000); box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+.colorPanel { min-width: 0; width: 236px; padding: 8px; }
+.colorPanel .swatches { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-bottom: 6px; }
+.colorPanel .sw { width: 100%; aspect-ratio: 1; border: 1px solid rgba(0,0,0,.18); border-radius: 3px; padding: 0; cursor: pointer; }
+.colorPanel .sw.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.colorPanel .frow label.l { width: auto; }
+.colorPanel .cpHex { width: 76px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.colorPanel .cpWas { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; margin: 4px 0 8px; }
+.colorPanel .cpWas i { width: 28px; height: 16px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); }
+.colorPanel footer { display: flex; justify-content: flex-end; gap: 6px; }
+.styleCopy .btn.on { background: var(--accentSoft); }
+.frow.quick .btn { display: inline-flex; align-items: center; gap: 4px; }

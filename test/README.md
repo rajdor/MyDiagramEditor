@@ -1,6 +1,6 @@
 # Tests
 
-Version 1.1.0: 46 test files. Run them all from the repository root:
+Version 1.1.0: 53 test files. Run them all from the repository root:
 
 ```
 npm test                          # every test, about 5 minutes; summary in the console, details in test/out/results.txt
@@ -69,5 +69,10 @@ Only checks that do not depend on installed fonts are in baselines, so they pass
 | t46 | **New line labels have a background**: a label added by the Add label command or by double-clicking a line starts with the canvas colour in all six styles; labels restyled with the diagram keep the style's rule; the Transparent box still removes it |
 | t47 | **Render for the host, and hatch colour**: `de:render` answers with an SVG holding the labels and title, the size and the source, each answer with its id and its own ids, an error for bad XML, nothing from other senders, and the editor unchanged; pale fills are hatched a little deeper, white clearly deeper, mid fills as they are |
 | t48 | **Paste from draw.io XML**: a whole file, a model, a bare root, a run of cells and a fenced answer are read; a compressed page; lines stay attached under new ids; a second paste adds; one undo; refusals say why and add nothing; hostile labels are cleaned; the command reads the clipboard or opens a box to paste into; it works in embed mode and Done returns the shapes |
+| t49 | **Clipboard keys**: Ctrl+V adds draw.io XML from the system clipboard in one undo step; Ctrl+C and Ctrl+X put the shapes there as draw.io XML; a paste after a copy here uses the editor's own copy, stepped aside; other words on the clipboard paste the shapes last copied; in a text box the keys copy text |
+| t50 | **Copy and paste style, and the colour panel**: fonts, colours, fill, line, shadow go across while text, size, place and kind of shape stay; word colours in the label come off; shape to line; locked shapes; one undo; Alt+Shift+C and Alt+Shift+V; the painter once, kept and Esc; colour panel preview, Cancel, Esc, click elsewhere, hex, OK as one undo, OK on selected words while editing |
+| t51 | **Arrange**: the panel's align, distribute and match size buttons; Same width and align left, Same height and align top; the first shape clicked sets the size, the widest, tallest or largest after a drag box or Select all; several shapes resized together by the same amount from one shape's handle, locked shapes left alone, one undo |
+| t52 | **Label spacing and paste**: a fixed line height in a label is ignored so larger words get 1.2 of their own size; text pasted into a label loses its own font, size, colour and line height, keeps bold and italic, and a pasted heading becomes a bold line |
+| t53 | **Mixed fonts and sizes**: shapes whose fonts or sizes differ show Mixed and any font chosen applies; while editing, the list follows the selected words, Mixed when they differ, and choosing the shape's own font applies it |
 
 Screenshots and exported files from the last run are written to `test/out/` (ignored by git).

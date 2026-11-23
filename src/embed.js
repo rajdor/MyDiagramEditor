@@ -88,4 +88,4 @@ function prefixSvgIds(svg, p) {
 }
 COMMANDS.embedDone = embedDone;
 COMMANDS.embedCancel = embedCancel;
-Object.assign(window.DiagramEditor, { embedDone, embedCancel, prefixSvgIds, EMBED, pasteXml, pasteXmlText, drawioXmlFrom });
+Object.assign(window.DiagramEditor, { embedDone, embedCancel, prefixSvgIds, EMBED, pasteXml, pasteXmlText, drawioXmlFrom, shapeKind, copyStyle, pasteStyle });

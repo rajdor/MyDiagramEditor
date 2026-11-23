@@ -1,5 +1,6 @@
 /* ===== Commands, menus, toolbar, palette, format panel, pages, dialogs ===== */
 const ICONS = {
+  brush: '<path d="M14 4l6 6-7.5 7.5-6-6z"/><path d="M6.5 11.5L4 14c-1 1-1 3 0 4l2 2c1 1 3 1 4 0l2.5-2.5"/><path d="M16 6l2-2"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
   redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
   trash: '<path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>',
@@ -18,6 +19,11 @@ const ICONS = {
   alignM: '<path d="M3 12h18"/><rect x="6" y="5" width="4" height="14"/><rect x="14" y="8" width="4" height="8"/>',
   alignB: '<path d="M3 20h18"/><rect x="6" y="5" width="4" height="12"/><rect x="14" y="10" width="4" height="7"/>',
   distH: '<path d="M4 3v18M20 3v18"/><rect x="9" y="8" width="6" height="8"/>',
+  matchW: '<path d="M3 12h18M6 9l-3 3 3 3M18 9l3 3-3 3"/><path d="M3 5v3M21 5v3M3 16v3M21 16v3"/>',
+  matchH: '<path d="M12 3v18M9 6l3-3 3 3M9 18l3 3 3-3"/><path d="M5 3h3M16 3h3M5 21h3M16 21h3"/>',
+  matchWH: '<rect x="6" y="6" width="12" height="12"/><path d="M3 3l3 3M21 3l-3 3M3 21l3-3M21 21l-3-3"/>',
+  widthLeft: '<path d="M4 3v18"/><rect x="7" y="5" width="13" height="5"/><rect x="7" y="14" width="13" height="5"/>',
+  heightTop: '<path d="M3 4h18"/><rect x="5" y="7" width="5" height="13"/><rect x="14" y="7" width="5" height="13"/>',
   distV: '<path d="M3 4h18M3 20h18"/><rect x="8" y="9" width="8" height="6"/>',
   sketch: '<path d="M3 17c3-1 4-6 7-6s2 5 5 5 4-4 6-5"/><path d="M14 4l6 6-9 9H5v-6z" opacity=".35"/>',
   st_outline: '<rect x="4" y="5" width="16" height="14" rx="3"/>',
@@ -56,8 +62,8 @@ const COMMANDS = {
   testDiagram: () => confirmDiscard(loadTestDiagram),
   undo: () => undo(), redo: () => redo(),
   copy: () => copySel(), cut: () => cutSel(), paste: () => pasteClip(), duplicate: () => { const keep = S.clipboard; copySel(true); pasteClip(true); S.clipboard = keep; },
-  delete: () => deleteSel(), selectAll: () => setSel(topUnits(page().cells.filter(c => !isHiddenByLayer(page(), c, S.map) && (!c.isEdgeLabel && !isGroup(c) || isGroup(c)))).filter(c => !c.isEdgeLabel).map(c => selectionUnitTop(c).id).filter((v, i, a) => a.indexOf(v) === i)),
-  copyXml: () => copyAsXml(), pasteXml: () => { pasteXml(); },
+  delete: () => deleteSel(), selectAll: () => setSelAuto(topUnits(page().cells.filter(c => !isHiddenByLayer(page(), c, S.map) && (!c.isEdgeLabel && !isGroup(c) || isGroup(c)))).filter(c => !c.isEdgeLabel).map(c => selectionUnitTop(c).id).filter((v, i, a) => a.indexOf(v) === i)),
+  copyXml: () => copyAsXml(), pasteXml: () => { pasteXml(); }, copyStyle: () => copyStyle(), pasteStyle: () => pasteStyle(), paintStyle: () => S.painter ? paintEnd() : paintStart(false),
   zoomIn: () => setZoom(S.zoom * 1.2), zoomOut: () => setZoom(S.zoom / 1.2), zoom100: () => setZoom(1), fit: () => fitView(),
   toggleClean: () => { S.clean = !S.clean; S.hover = null; S.hoverPoint = null; if (S.clean) { if (S.editing) finishEdit(); toast('Screenshot mode: press Esc or Ctrl+Shift+E to return'); } requestRender(); updateToolbar(); },
   canvasBg: () => canvasBgDialog(),
@@ -76,7 +82,7 @@ const COMMANDS = {
   alignL: () => alignSel('left'), alignC: () => alignSel('center'), alignR: () => alignSel('right'),
   alignT: () => alignSel('top'), alignM: () => alignSel('middle'), alignB: () => alignSel('bottom'),
   distH: () => distributeSel('h'), distV: () => distributeSel('v'),
-  matchW: () => matchSize('w'), matchH: () => matchSize('h'), matchWH: () => matchSize('wh'),
+  matchW: () => matchSize('w'), matchH: () => matchSize('h'), matchWH: () => matchSize('wh'), widthLeft: () => sizeAndAlign('w'), heightTop: () => sizeAndAlign('h'),
   group: () => groupSel(), ungroup: () => ungroupSel(), toFront: () => zOrder(true), toBack: () => zOrder(false),
   lock: () => mutate(() => { const cs = selCells(); const on = !cs.every(isLocked); for (const c of cs) setStyle(c.style, 'locked', on ? 1 : null); }),
   arrangeShapes: () => arrangeDialog(), arrangeLines: () => { mutate(() => { const n = minimiseCrossings(selectedOrAllEdges(), { keepWaypoints: false }); toast('Lines re-routed. Crossings: ' + n.before + ' to ' + n.after); }); },
@@ -110,7 +116,8 @@ function menuDefs() {
       { t: 'Undo', c: 'undo', sc: 'Ctrl+Z', dis: !S.undo.length }, { t: 'Redo', c: 'redo', sc: 'Ctrl+Y', dis: !S.redo.length }, '-',
       { t: 'Cut', c: 'cut', sc: 'Ctrl+X', dis: !has }, { t: 'Copy', c: 'copy', sc: 'Ctrl+C', dis: !has }, { t: 'Paste', c: 'paste', sc: 'Ctrl+V', dis: !S.clipboard },
       { t: 'Duplicate', c: 'duplicate', sc: 'Ctrl+D', dis: !has }, { t: 'Delete', c: 'delete', sc: 'Del', dis: !has }, '-',
-      { t: 'Select all', c: 'selectAll', sc: 'Ctrl+A' }, { t: 'Copy selection as draw.io XML', c: 'copyXml', dis: !has }, { t: 'Paste from draw.io XML (clipboard)', c: 'pasteXml' }
+      { t: 'Select all', c: 'selectAll', sc: 'Ctrl+A' }, { t: 'Copy selection as draw.io XML', c: 'copyXml', dis: !has }, { t: 'Paste from draw.io XML (clipboard)', c: 'pasteXml' }, '-',
+      { t: 'Copy style', c: 'copyStyle', sc: 'Alt+Shift+C', dis: !has }, { t: 'Paste style', c: 'pasteStyle', sc: 'Alt+Shift+V', dis: !has || !S.styleClip }
     ],
     View: [
       { t: 'Zoom in', c: 'zoomIn', sc: 'Ctrl++' }, { t: 'Zoom out', c: 'zoomOut', sc: 'Ctrl+-' }, { t: 'Actual size', c: 'zoom100', sc: 'Ctrl+0' }, { t: 'Fit diagram', c: 'fit', sc: 'Ctrl+Shift+H' }, '-',
@@ -124,7 +131,7 @@ function menuDefs() {
     Arrange: [
       { t: 'Align', sub: [{ t: 'Left', c: 'alignL' }, { t: 'Centre', c: 'alignC' }, { t: 'Right', c: 'alignR' }, '-', { t: 'Top', c: 'alignT' }, { t: 'Middle', c: 'alignM' }, { t: 'Bottom', c: 'alignB' }], dis: !multi },
       { t: 'Distribute', sub: [{ t: 'Horizontally', c: 'distH' }, { t: 'Vertically', c: 'distV' }], dis: topUnits(selCells()).length < 3 },
-      { t: 'Match size', sub: [{ t: 'Width', c: 'matchW' }, { t: 'Height', c: 'matchH' }, { t: 'Width and height', c: 'matchWH' }], dis: !multi }, '-',
+      { t: 'Match size', sub: [{ t: 'Width', c: 'matchW' }, { t: 'Height', c: 'matchH' }, { t: 'Width and height', c: 'matchWH' }, '-', { t: 'Same width, align left', c: 'widthLeft' }, { t: 'Same height, align top', c: 'heightTop' }], dis: !multi }, '-',
       { t: 'Group', c: 'group', sc: 'Ctrl+G', dis: !multi }, { t: 'Ungroup', c: 'ungroup', sc: 'Ctrl+Shift+G', dis: !selCells().some(isGroup) }, '-',
       { t: 'Bring to front', c: 'toFront', sc: 'Ctrl+Shift+F', dis: !has }, { t: 'Send to back', c: 'toBack', sc: 'Ctrl+Shift+B', dis: !has },
       { t: 'Lock / unlock', c: 'lock', sc: 'Ctrl+L', dis: !has }, '-',
@@ -171,6 +178,7 @@ function contextMenu(ev) {
   if (c && !c.e && !isGroup(c)) items.push({ t: 'Edit text', fn: () => startEdit(c) }, { t: S.editPoints === c.id ? 'Finish editing connection points' : 'Edit connection points', fn: () => toggleEditPoints(c) }, '-');
   if (c && c.e) items.push({ t: 'Add label', fn: () => addLabelToEdge(c) }, { t: 'Reset path', fn: () => mutate(() => { c.pts = []; }) }, '-');
   if (S.sel.length) items.push({ t: 'Cut', c: 'cut' }, { t: 'Copy', c: 'copy' }, { t: 'Duplicate', c: 'duplicate' }, { t: 'Delete', c: 'delete' }, '-',
+    { t: 'Copy style', c: 'copyStyle', sc: 'Alt+Shift+C' }, { t: 'Paste style', c: 'pasteStyle', sc: 'Alt+Shift+V', dis: !S.styleClip }, '-',
     { t: 'Bring to front', c: 'toFront' }, { t: 'Send to back', c: 'toBack' }, { t: 'Lock / unlock', c: 'lock' });
   if (topUnits(selCells()).length > 1) items.push({ t: 'Group', c: 'group' });
   if (selCells().some(isGroup)) items.push({ t: 'Ungroup', c: 'ungroup' });
@@ -551,13 +559,39 @@ function cutSel() {
   if (!cs.length) return toast('Locked shapes can\'t be cut. Copy them instead, or unlock them first.');
   S.sel = cs.map(c => c.id); copySel(true); deleteSel();
   toast(cs.length < all.length ? 'Cut ' + cs.length + '; locked shapes were left in place' : 'Cut');
-  try { if (navigator.clipboard) navigator.clipboard.writeText(cellsToXml(S.clipboard.cells)).catch(() => { }); } catch (e) { }
+  S.clipText = cellsToXml(S.clipboard.cells); try { if (navigator.clipboard) navigator.clipboard.writeText(S.clipText).catch(() => { }); } catch (e) { }
 }
 function copySel(internalOnly) {
   const cs = selCells(); if (!cs.length) return;
   S.clipboard = { cells: collectForCopy(cs), n: 0 };
-  if (!internalOnly) { try { if (navigator.clipboard) navigator.clipboard.writeText(cellsToXml(S.clipboard.cells)).catch(() => { }); } catch (e) { } toast('Copied'); }
+  if (!internalOnly) { S.clipText = cellsToXml(S.clipboard.cells); try { if (navigator.clipboard) navigator.clipboard.writeText(S.clipText).catch(() => { }); } catch (e) { } toast('Copied'); }
 }
+/* Ctrl+C, Ctrl+X and Ctrl+V go through the browser's own copy, cut and paste, so the shapes reach the system clipboard as
+   draw.io XML and come back from it with no permission asked. Shapes copied here can then be pasted into another diagram
+   in another document or another tab, or into draw.io; draw.io XML copied anywhere else pastes in as shapes. What was
+   last copied here is pasted from the editor's own copy, which keeps every detail and steps each paste aside. */
+function clipOff(e) { return isTyping(e) || S.editing || $('#modalRoot').children.length; }
+function onClipCopy(e, cut) {
+  if (clipOff(e)) return;
+  const all = selCells(); if (!all.length) return;
+  e.preventDefault();
+  if (cut) { const cs = all.filter(c => !isLocked(c)); if (!cs.length) return toast('Locked shapes can\'t be cut. Copy them instead, or unlock them first.'); S.sel = cs.map(c => c.id); }
+  copySel(true); S.clipText = cellsToXml(S.clipboard.cells);
+  try { e.clipboardData.setData('text/plain', S.clipText); } catch (x) { }
+  if (cut) { const n = S.sel.length; deleteSel(); toast(n < all.length ? 'Cut ' + n + '; locked shapes were left in place' : 'Cut'); } else toast('Copied');
+}
+function onClipPaste(e) {
+  if (clipOff(e)) return;
+  e.preventDefault();
+  let text = ''; try { text = e.clipboardData.getData('text/plain') || ''; } catch (x) { }
+  if (S.clipboard && (!text.trim() || text === S.clipText)) return pasteClip();
+  if (drawioXmlFrom(text)) { pasteXmlText(text).then(why => { if (why) toast(why, 5000); }); return; }
+  if (S.clipboard) return pasteClip();
+  toast('Nothing to paste: the clipboard holds no shapes or draw.io XML.');
+}
+document.addEventListener('copy', e => { S.clipNative = true; onClipCopy(e, false); });
+document.addEventListener('cut', e => { S.clipNative = true; onClipCopy(e, true); });
+document.addEventListener('paste', e => { S.clipNative = true; onClipPaste(e); });
 function pasteClip(dup) {
   if (!S.clipboard) return;
   S.clipboard.n++;
@@ -609,6 +643,61 @@ function pasteClip(dup) {
     S.sel = topUnits(cells.filter(c => !c.isEdgeLabel)).map(c => c.id);
   });
 }
+/* ---------- copy and paste style ----------
+   The look of one shape or line onto others: fonts, colours, fill, line, shadow, rounding, sketch settings and the
+   Blueprint state. Never the text, size, place, rotation, connections or kind of shape. From a shape to a line, or a
+   line to a shape, only what both have is copied (line and text); a text box takes the text only. Colours, fonts and
+   sizes set on single words in a label are taken off, so the whole label takes the copied text style. Keys: Alt+Shift+C
+   and Alt+Shift+V (Option on a Mac; Ctrl+Shift+C is the browser's Inspect). The painter: click once to paint the next
+   shape clicked, double-click to keep painting until Esc. The copied style lasts while the editor is open. */
+const STYLE_TEXT = ['fontColor', 'fontSize', 'fontFamily', 'fontSource', 'fontStyle', 'align', 'verticalAlign', 'labelBackgroundColor', 'deGlow', 'spacing', 'spacingLeft', 'spacingRight', 'spacingTop', 'spacingBottom', 'textOpacity'];
+const STYLE_LINE = ['strokeColor', 'strokeWidth', 'dashed', 'dashPattern', 'opacity', 'sketch', 'jiggle', 'curveFitting', 'deMode', 'deShadow', 'deShadowColor', 'deShadowOpacity', 'deShadowDx', 'deShadowDy'];
+const STYLE_SHAPE = ['fillColor', 'fillOpacity', 'fillStyle', 'fillWeight', 'hachureGap', 'deHarvey', 'deDots', 'deDotsColor', 'deDouble', 'rounded', 'arcSize', 'absoluteArcSize', 'deState', 'gradientColor', 'gradientDirection'];
+const STYLE_EDGE = ['startArrow', 'endArrow', 'startSize', 'endSize', 'startFill', 'endFill', 'jumpStyle', 'jumpSize', 'deLine'];
+function styleFamily(c) { if (c.e) return 'edge'; if (c.isEdgeLabel) return 'text'; const k = shapeKind(c); return k === 'text' || k === 'edgeLabel' ? 'text' : 'shape'; }
+function styleKeysFor(from, to) {
+  const k = STYLE_TEXT.slice();
+  if (from !== 'text' && to !== 'text') k.push(...STYLE_LINE);
+  if (from === 'shape' && to === 'shape') k.push(...STYLE_SHAPE);
+  if (from === 'edge' && to === 'edge') k.push(...STYLE_EDGE);
+  return k;
+}
+function copyStyle(quiet) {
+  const c = styleTargets()[0]; if (!c) { if (!quiet) toast('Select a shape or line to copy its style.'); return false; }
+  const all = new Set([...STYLE_TEXT, ...STYLE_LINE, ...STYLE_SHAPE, ...STYLE_EDGE]), st = {};
+  for (const k of all) if (c.style[k] !== undefined) st[k] = c.style[k];
+  S.styleClip = { fam: styleFamily(c), st };
+  if (!quiet) toast('Style copied. Alt+Shift+V pastes it on the selected shapes.');
+  updateToolbar(); return true;
+}
+// Colours, fonts and sizes set on single words come off; bold, italic, lists and the words stay.
+function plainLabelLook(v) {
+  if (typeof v !== 'string' || v.indexOf('<') < 0) return v;
+  const t = document.createElement('template'); t.innerHTML = v; const r = t.content;
+  r.querySelectorAll('font').forEach(f => { ['color', 'face', 'size'].forEach(a => f.removeAttribute(a)); if (!f.attributes.length) f.replaceWith(...f.childNodes); });
+  r.querySelectorAll('[style]').forEach(e => { for (const p of ['color', 'font-family', 'font-size', 'background-color', 'background']) e.style.removeProperty(p); if (!e.getAttribute('style').trim()) e.removeAttribute('style'); });
+  r.querySelectorAll('span:not([class]):not([style])').forEach(x => x.replaceWith(...x.childNodes));
+  const d = document.createElement('div'); d.appendChild(r); return d.innerHTML;
+}
+function pasteStyle() {
+  const clip = S.styleClip; if (!clip) { toast('Copy a style first: select a shape or line and press Alt+Shift+C.'); return false; }
+  const ts = styleTargets().filter(c => !isLocked(c)); if (!ts.length) { toast('Select the shapes or lines to give the style to.'); return false; }
+  mutate(() => {
+    for (const c of ts) {
+      for (const k of styleKeysFor(clip.fam, styleFamily(c))) { if (clip.st[k] !== undefined) c.style[k] = clip.st[k]; else delete c.style[k]; }
+      c.value = plainLabelLook(c.value);
+    }
+  }, { keepPanel: false });
+  return true;
+}
+function paintStart(keep) {
+  if (!S.styleClip || S.sel.length) { if (!copyStyle(true)) { toast('Select the shape or line whose style to paint with.'); return; } }
+  S.painter = { keep: !!keep }; $('#svg').style.cursor = 'copy';
+  toast(keep ? 'Painting the style: click each shape or line. Esc to stop.' : 'Click the shape or line to paint the style on.', 4000);
+  updateToolbar(); buildFormat();
+}
+function paintEnd() { if (!S.painter) return; S.painter = null; $('#svg').style.cursor = ''; updateToolbar(); buildFormat(); }
+function paintAt(unit) { const keep = S.sel; S.sel = [unit.id]; pasteStyle(); if (!S.painter || !S.painter.keep) { S.sel = keep.includes(unit.id) ? keep : [unit.id]; paintEnd(); } else S.sel = [unit.id]; requestRender(); }
 function cellsToXml(cells) {
   const pg = newPage('clip'); pg.cells = cells.map(deep);
   const ids = new Set(pg.cells.map(c => c.id));
@@ -686,10 +775,23 @@ function distributeSel(axis) {
   const gap = (span - total) / (items.length - 1);
   mutate(() => { let pos = H ? first.x : first.y; for (const it of items) { const d = pos - (H ? it.b.x : it.b.y); translateCells([it.u], H ? d : 0, H ? 0 : d); pos += (H ? it.b.w : it.b.h) + gap; } });
 }
+/* The shape the others take their size from: the first one clicked. A selection made with a drag box, or Select all, has
+   no first click, so there it is the widest (for a width), the tallest (for a height), or the largest (for both). */
+function sizeRef(cs, which) {
+  if (!S.selAuto) return cs[0];
+  const key = which === 'w' ? c => c.w : which === 'h' ? c => c.h : c => c.w * c.h;
+  return cs.reduce((a, c) => key(c) > key(a) ? c : a, cs[0]);
+}
+// Make the same width and align left, or the same height and align top: the size of the reference, the leftmost left edge or the topmost top.
+function sizeAndAlign(which) {
+  const cs = topUnits(selCells()).filter(c => !c.e && !c.isEdgeLabel && !isGroup(c) && !isLocked(c)); if (cs.length < 2) return;
+  const ref = sizeRef(cs, which), W = which === 'w', edge = Math.min(...cs.map(c => W ? worldBox(c).x : worldBox(c).y));
+  mutate(() => { for (const c of cs) { if (W) c.w = ref.w; else c.h = ref.h; const b = worldBox(c); translateCells([c], W ? edge - b.x : 0, W ? 0 : edge - b.y); } });
+}
 function matchSize(which) {
   const cs = topUnits(selCells()).filter(c => !c.e && !c.isEdgeLabel && !isGroup(c) && !isLocked(c)); if (cs.length < 2) return;
-  const ref = cs[0];
-  mutate(() => { for (const c of cs.slice(1)) { const cc = cellCenter(c); if (which.includes('w')) { c.w = ref.w; c.x = cc.x - c.w / 2; } if (which.includes('h')) { c.h = ref.h; c.y = cc.y - c.h / 2; } } });
+  const ref = sizeRef(cs, which);
+  mutate(() => { for (const c of cs) { if (c === ref) continue; const cc = cellCenter(c); if (which.includes('w')) { c.w = ref.w; c.x = cc.x - c.w / 2; } if (which.includes('h')) { c.h = ref.h; c.y = cc.y - c.h / 2; } } });
 }
 function groupSel() {
   const all = topUnits(selCells()).filter(c => !c.isEdgeLabel);
@@ -759,7 +861,60 @@ function frow(sec, label) { const r = document.createElement('div'); r.className
 function mkBtn(text, fn, cls, title) { const b = document.createElement('button'); b.className = 'btn sm ' + (cls || ''); b.innerHTML = text; if (title) b.title = title; b.onmousedown = (e) => e.preventDefault(); b.onclick = fn; return b; }
 function mkNum(val, fn, step, min) { const i = document.createElement('input'); i.type = 'number'; i.value = round2(val); i.step = step || 1; if (min !== undefined) i.min = min; i.onchange = () => { const v = parseFloat(i.value); if (!isNaN(v)) fn(v); }; return i; }
 function mkSel(opts, val, fn) { const s = document.createElement('select'); for (const o of opts) { const op = document.createElement('option'); op.value = o.v; op.textContent = o.label; s.appendChild(op); } s.value = val; s.onchange = () => fn(s.value); return s; }
-function mkColor(val, fn) { const i = document.createElement('input'); i.type = 'color'; i.value = /^#[0-9a-f]{6}$/i.test(val || '') ? val : '#000000'; i.oninput = () => fn(i.value, true); i.onchange = () => fn(i.value); return i; }
+/* A colour in the format panel is a button showing the colour. It opens a small panel: the palette's colours, a picker
+   for any colour, and its hex code. What is chosen is shown at once on the diagram; OK keeps it as one undo step,
+   Cancel (or Esc, or a click elsewhere) puts it back. fn(value, true) previews, fn(value) applies. While a label's text is
+   being edited the colour is not previewed; OK applies it to the selected words. */
+const colorSwatches = () => [...new Set(['#000000', '#1e293b', '#475569', '#94a3b8', '#e2e8f0', '#ffffff'].concat(PALETTE.map(p => p.font), PALETTE.map(p => p.stroke), PALETTE.map(p => p.fill)).map(c => c.toLowerCase()))];
+let colorPanel = null;
+function mkColor(val, fn, opts) {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'colorBtn';
+  const v0 = /^#[0-9a-f]{6}$/i.test(val || '') ? val.toLowerCase() : '#000000';
+  b.dataset.value = v0; b.style.setProperty('--c', v0); b.title = 'Colour ' + v0 + ': click to change'; b.setAttribute('aria-label', b.title);
+  b.onmousedown = (e) => e.preventDefault();
+  b.onclick = (e) => { e.stopPropagation(); if (colorPanel && colorPanel.btn === b) return colorClose(false); openColorPanel(b, fn, !(opts && opts.noPreview)); };
+  return b;
+}
+function openColorPanel(btn, fn, preview) {
+  colorClose(false);
+  const orig = btn.dataset.value; let cur = orig;
+  const d = document.createElement('div'); d.className = 'popup colorPanel'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-label', 'Choose a colour');
+  d.innerHTML = '<div class="swatches">' + colorSwatches().map(c => '<button type="button" class="sw" data-c="' + c + '" title="' + c + '" style="background:' + c + '"></button>').join('') + '</div>'
+    + '<div class="frow"><label class="l">Custom</label><input type="color" class="cpPick"><input type="text" class="cpHex" maxlength="7" spellcheck="false" aria-label="Hex code"></div>'
+    + '<div class="cpWas"><span>Was</span><i style="background:' + orig + '"></i><span>Now</span><i class="cpNow"></i></div>'
+    + '<footer><button type="button" class="btn sm cpCancel">Cancel</button><button type="button" class="btn sm primary cpOk">OK</button></footer>';
+  const pick = d.querySelector('.cpPick'), hex = d.querySelector('.cpHex'), now = d.querySelector('.cpNow');
+  const show = (c, from) => {
+    cur = c; if (from !== pick) pick.value = c; if (from !== hex) hex.value = c; now.style.background = c;
+    d.querySelectorAll('.sw').forEach(sw => sw.classList.toggle('on', sw.dataset.c === c));
+    btn.style.setProperty('--c', c); if (preview && c !== orig) fn(c, true);
+  };
+  d.querySelectorAll('.sw').forEach(sw => { sw.onmousedown = (e) => e.preventDefault(); sw.onclick = () => show(sw.dataset.c); sw.ondblclick = () => colorClose(true); });
+  pick.oninput = () => show(pick.value.toLowerCase(), pick);
+  hex.oninput = () => { const t = hex.value.trim().replace(/^([0-9a-f]{6})$/i, '#$1'); if (/^#[0-9a-f]{6}$/i.test(t)) show(t.toLowerCase(), hex); };
+  d.querySelector('.cpOk').onclick = () => colorClose(true);
+  d.querySelector('.cpCancel').onclick = () => colorClose(false);
+  d.querySelectorAll('footer button').forEach(x => { x.onmousedown = (e) => e.preventDefault(); });
+  document.body.appendChild(d);
+  const r = btn.getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight;
+  d.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px'; d.style.top = (r.bottom + 4 + h > innerHeight - 8 ? Math.max(8, r.top - h - 4) : r.bottom + 4) + 'px';
+  colorPanel = { d, btn, fn, preview, orig, get cur() { return cur; } };
+  show(orig);
+  setTimeout(() => document.addEventListener('pointerdown', colorOutside, true), 0);
+  window.addEventListener('keydown', colorKeys, true);
+}
+// Esc cancels and Enter keeps, wherever the focus is (the swatches and buttons do not take it, so a label being edited keeps its selection)
+function colorKeys(e) { if (!colorPanel) return; if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); colorClose(false); } else if (e.key === 'Enter' && (!e.target.closest || !e.target.closest('[contenteditable=true]') || colorPanel.d.contains(e.target))) { e.preventDefault(); e.stopImmediatePropagation(); colorClose(true); } }
+function colorOutside(e) { if (colorPanel && !colorPanel.d.contains(e.target) && e.target !== colorPanel.btn) colorClose(false); }
+function colorClose(keep) {
+  const p = colorPanel; if (!p) return; colorPanel = null;
+  document.removeEventListener('pointerdown', colorOutside, true); window.removeEventListener('keydown', colorKeys, true); p.d.remove();
+  if (keep && p.cur !== p.orig) { p.btn.dataset.value = p.cur; p.fn(p.cur); return; }
+  p.btn.style.setProperty('--c', p.orig);
+  if (!p.preview || p.cur === p.orig) { colorLive = null; return; }
+  if (colorLive) { const pre = colorLive; colorLive = null; restoreQuiet(pre); requestRender(); buildFormat(); }   // the shapes as they were before the preview
+  else p.fn(p.orig, true);
+}
 function mkChk(label, val, fn) { const l = document.createElement('label'); l.className = 'chk'; const i = document.createElement('input'); i.type = 'checkbox'; i.checked = !!val; i.onchange = () => fn(i.checked); l.appendChild(i); l.appendChild(document.createTextNode(label)); return l; }
 function styleTargets() {
   const out = [];
@@ -778,6 +933,17 @@ function liveColor(k, filter) {
     else applyStyle(c => { c.style[k] = v; }, filter);
   };
 }
+// Copy style, Paste style and the painter, at the top of the panel for a selection.
+function formatStyleCopy() {
+  const r = frow(fsec('Style')); r.classList.add('styleCopy');
+  r.appendChild(mkBtn('Copy style', () => copyStyle(), '', 'Copy the fonts, colours, fill and line of this shape (Alt+Shift+C)'));
+  const p = mkBtn('Paste style', () => pasteStyle(), '', S.styleClip ? 'Give the selected shapes the copied style (Alt+Shift+V)' : 'Copy a style first'); p.disabled = !S.styleClip; r.appendChild(p);
+  const b = mkBtn(icon('brush'), null, S.painter ? 'on' : '', 'Paint the style: click once to paint one shape, double-click to keep painting until Esc');
+  b.setAttribute('aria-label', 'Paint the style'); b.setAttribute('aria-pressed', S.painter ? 'true' : 'false');
+  let t = null; b.onclick = () => { clearTimeout(t); t = setTimeout(() => { if (S.painter) paintEnd(); else paintStart(false); }, 220); };
+  b.ondblclick = () => { clearTimeout(t); paintStart(true); };
+  r.appendChild(b);
+}
 function buildFormat() {
   const f = $('#format'); f.innerHTML = '';
   updateToolbar();
@@ -787,6 +953,7 @@ function buildFormat() {
   const targets = styleTargets();
   const verts = targets.filter(c => !c.e && !c.isEdgeLabel), edges = targets.filter(c => c.e), labels = targets.filter(c => c.isEdgeLabel);
   const first = cs[0];
+  formatStyleCopy();
   if (S.doc.mode === 'blueprint') formatBlueprint(verts, edges);
   if (verts.length) formatShapeStyle(verts);
   if (verts.some(c => shapeKind(c) !== 'text')) formatShadow(verts);
@@ -899,7 +1066,7 @@ function formatShadow(verts) {
   frow(s).appendChild(mkChk('Shadow', !!cur, (v) => applyStyle(cl => setShadow(cl.style, v ? (shadowOf(cl.style) || shadowDefault()) : null), on)));
   if (!cur) return;
   const r1 = frow(s, 'Colour');
-  r1.appendChild(mkColor(cur.color, (v, live) => { if (!live) set(x => { x.color = v; }); }));
+  r1.appendChild(mkColor(cur.color, (v, live) => { if (live) { if (!colorLive) colorLive = snapshot(); for (const cl of styleTargets()) if (on(cl)) { const x = shadowOf(cl.style) || shadowDefault(); x.color = v; setShadow(cl.style, x); } requestRender(); return; } if (colorLive) { const pre = colorLive; colorLive = null; for (const cl of styleTargets()) if (on(cl)) { const x = shadowOf(cl.style) || shadowDefault(); x.color = v; setShadow(cl.style, x); } refreshMap(); pushUndo(pre); afterChange({ keepPanel: true }); } else set(x => { x.color = v; }); }));
   const op = mkNum(cur.opacity, (v) => set(x => { x.opacity = clamp(Math.round(v), 0, 100); }), 5, 0); op.title = 'Opacity (%)'; r1.appendChild(op);
   const size = Math.max(Math.abs(cur.dx), Math.abs(cur.dy));
   const dir = SHADOW_DIRS.find(d => d[2] === Math.sign(cur.dx) && d[3] === Math.sign(cur.dy)) || SHADOW_DIRS[0];
@@ -926,6 +1093,21 @@ function formatBlueprint(verts, edges) {
     frow(s, 'Line').appendChild(mkSel(BP_LINES.map(l => ({ v: l.id, label: l.label })), BP_LINES.some(l => l.id === cur) ? cur : 'existing', (v) => applyStyle(cl => { bpSetLine(cl, v); cl.style.deMode = 'blueprint'; }, cl => cl.e && !cl.style.deNote)));
   }
 }
+/* While a label is edited, the Font list and Size box show the font and size of the selected words, or Mixed when they
+   differ, so that choosing any font or size applies it. They used to show the shape's own, so choosing that one did nothing. */
+function textSelSync() {
+  const E = S.editing, fs = $('#fontSel'), fz = $('#fontNum'); if (!E || !fs || !fz) return;
+  const rg = E.range && E.ed.contains(E.range.commonAncestorContainer) ? E.range : null;
+  const nodes = []; const w = document.createTreeWalker(E.ed, NodeFilter.SHOW_TEXT);
+  for (let n; (n = w.nextNode());) if (n.data.trim() && (!rg || rg.collapsed ? true : rg.intersectsNode(n))) nodes.push(n);
+  let pick = nodes; if (rg && rg.collapsed) { let n = rg.startContainer; if (n.nodeType !== 3) n = n.childNodes[rg.startOffset] || n.childNodes[rg.startOffset - 1] || n; pick = n && n.nodeType === 3 ? [n] : n && n.nodeType === 1 ? [n] : []; }
+  if (!pick.length) pick = [E.ed];
+  const cs = pick.map(n => getComputedStyle(n.nodeType === 3 ? n.parentElement : n));
+  const fam = new Set(cs.map(c => { const f = c.fontFamily.split(',')[0].replace(/["']/g, '').trim(); const o = [...fs.options].find(o => o.value && (o.value.toLowerCase() === f.toLowerCase() || fontCss(o.value).split(',')[0].replace(/["']/g, '').trim().toLowerCase() === f.toLowerCase())); return o ? o.value : f; }));
+  const size = new Set(cs.map(c => Math.round(parseFloat(c.fontSize))));
+  const f = fam.size === 1 ? [...fam][0] : ''; fs.value = [...fs.options].some(o => o.value === f) ? f : '';
+  if (document.activeElement !== fz) fz.value = size.size === 1 ? [...size][0] : '';
+}
 function formatText(cells, edges) {
   const tcells = cells.length ? cells : [];
   const st = tcells.length ? tcells[0].style : {};
@@ -940,10 +1122,15 @@ function formatText(cells, edges) {
   if (ed) { r1.appendChild(mkBtn('• List', () => exec('insertUnorderedList'), '', 'Bulleted list')); r1.appendChild(mkBtn('1. List', () => exec('insertOrderedList'), '', 'Numbered list')); r1.appendChild(mkBtn('Clear', () => exec('removeFormat'), '', 'Clear formatting')); }
   const fonts = ['Helvetica', 'Arial', 'Verdana', 'Georgia', 'Times New Roman', 'Courier New', SKETCH_FONT];
   const r2 = frow(s, 'Font');
-  r2.appendChild(mkSel(fonts.map(f => ({ v: f, label: f })), sv(st, 'fontFamily', DEFAULT_FONT), (v) => { if (ed) return exec('fontName', v); applyStyle(cl => { if (v === DEFAULT_FONT) { delete cl.style.fontFamily; delete cl.style.fontSource; } else { cl.style.fontFamily = v; if (v === SKETCH_FONT) cl.style.fontSource = SKETCH_FONT_SOURCE; else delete cl.style.fontSource; } }, cl => !cl.e); }));
+  // with shapes whose fonts differ, the list shows Mixed, so choosing any font applies it (choosing the one shown did nothing)
+  const fam0 = (c) => sv(c.style, 'fontFamily', DEFAULT_FONT), famMixed = tcells.some(c => fam0(c) !== fam0(tcells[0])), szMixed = tcells.some(c => sn(c.style, 'fontSize', 12) !== sn(tcells[0].style, 'fontSize', 12));
+  const fsel = mkSel([{ v: '', label: 'Mixed' }].concat(fonts.map(f => ({ v: f, label: f }))), famMixed ? '' : sv(st, 'fontFamily', DEFAULT_FONT), (v) => { if (!v) return; if (ed) return exec('fontName', v); applyStyle(cl => { if (v === DEFAULT_FONT) { delete cl.style.fontFamily; delete cl.style.fontSource; } else { cl.style.fontFamily = v; if (v === SKETCH_FONT) cl.style.fontSource = SKETCH_FONT_SOURCE; else delete cl.style.fontSource; } }, cl => !cl.e); });
+  fsel.id = 'fontSel'; fsel.options[0].hidden = true; r2.appendChild(fsel);
   const r3 = frow(s, 'Size');
-  r3.appendChild(mkNum(sn(st, 'fontSize', 12), (v) => { if (ed) { exec('fontSize', 7, true); S.editing.ed.querySelectorAll('font[size="7"]').forEach(f => { f.removeAttribute('size'); f.style.fontSize = v + 'px'; }); S.editing.ed.querySelectorAll('span').forEach(sp => { if (sp.style.fontSize === 'xxx-large' || sp.style.fontSize === '-webkit-xxx-large') sp.style.fontSize = v + 'px'; }); return; } applyStyle(cl => { cl.style.fontSize = String(clamp(v, 4, 200)); }, cl => !cl.e); }, 1, 4));
-  r3.appendChild(mkColor(sv(st, 'fontColor', '#1e293b'), ed ? (v, live) => { if (!live) exec('foreColor', v); } : liveColor('fontColor', cl => !cl.e)));
+  const fnum = mkNum(sn(st, 'fontSize', 12), (v) => { if (ed) { exec('fontSize', 7, true); S.editing.ed.querySelectorAll('font[size="7"]').forEach(f => { f.removeAttribute('size'); f.style.fontSize = v + 'px'; }); S.editing.ed.querySelectorAll('span').forEach(sp => { if (sp.style.fontSize === 'xxx-large' || sp.style.fontSize === '-webkit-xxx-large') sp.style.fontSize = v + 'px'; }); return; } applyStyle(cl => { cl.style.fontSize = String(clamp(v, 4, 200)); }, cl => !cl.e); }, 1, 4);
+  fnum.id = 'fontNum'; fnum.placeholder = 'Mixed'; if (szMixed) fnum.value = ''; r3.appendChild(fnum);
+  if (ed) setTimeout(textSelSync, 0);
+  r3.appendChild(mkColor(sv(st, 'fontColor', '#1e293b'), ed ? (v, live) => { if (!live) exec('foreColor', v); } : liveColor('fontColor', cl => !cl.e), { noPreview: ed }));
   const verts = tcells.filter(c => !c.isEdgeLabel);
   if (verts.length) {
     const r4 = frow(s, 'Position');
@@ -1040,7 +1227,15 @@ function formatArrange(cs) {
   r.appendChild(mkBtn(cs.every(isLocked) ? 'Unlock' : 'Lock', () => runCommand('lock')));
   if (topUnits(cs).length > 1) {
     const r2 = frow(s);
-    for (const a of ['alignL', 'alignC', 'alignR', 'alignT', 'alignM', 'alignB']) { const b = mkBtn(icon(a), () => runCommand(a), '', a); b.querySelector('svg').style.width = '16px'; b.querySelector('svg').style.height = '16px'; r2.appendChild(b); }
+    const ib = (a, title, dis) => { const b = mkBtn(icon(a), () => runCommand(a), '', title); b.setAttribute('aria-label', title); b.querySelector('svg').style.width = '16px'; b.querySelector('svg').style.height = '16px'; if (dis) { b.disabled = true; b.title = title + ' (select three or more)'; } return b; };
+    for (const a of ['alignL', 'alignC', 'alignR', 'alignT', 'alignM', 'alignB']) r2.appendChild(ib(a, { alignL: 'Align left', alignC: 'Align centre', alignR: 'Align right', alignT: 'Align top', alignM: 'Align middle', alignB: 'Align bottom' }[a]));
+    const few = topUnits(cs).length < 3, r3 = frow(s);
+    r3.appendChild(ib('distH', 'Distribute horizontally', few)); r3.appendChild(ib('distV', 'Distribute vertically', few));
+    const sz = (cs.length > 1 && !S.selAuto) ? ': the size of the first shape clicked' : ': the size of the widest, tallest or largest';
+    r3.appendChild(ib('matchW', 'Match width' + sz)); r3.appendChild(ib('matchH', 'Match height' + sz)); r3.appendChild(ib('matchWH', 'Match width and height' + sz));
+    const r4 = frow(s); r4.classList.add('quick');
+    const q = (a, t, title) => { const b = mkBtn(icon(a) + '<span>' + t + '</span>', () => runCommand(a), '', title); b.querySelector('svg').style.width = '16px'; b.querySelector('svg').style.height = '16px'; return b; };
+    r4.appendChild(q('widthLeft', 'Width, left', 'Same width' + sz + ', and align left')); r4.appendChild(q('heightTop', 'Height, top', 'Same height' + sz + ', and align top'));
   }
 }
 

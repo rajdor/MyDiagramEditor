@@ -73,7 +73,7 @@ ok(r.darkOk && r.fill === '#dbeafe', 'switching to a dark canvas corrects outlin
 ok(r.back === 0 && /Canvas/.test(r.report), 'switching back to light corrects again, and the report records it');
 // your own edits are left exactly as you set them; the next bulk action (style or canvas switch, or a Fix button) corrects them
 r = await ev(() => { const E = DiagramEditor, S = E.S; S.doc = E.newDoc(); S.pi = 0; E.clearCache(); S.undo = []; const P = E.page(); const a = E.makeVertex('rect', 40, 40); a.value = 'Text'; a.style.fillColor = '#ffffff'; E.mutate(() => P.cells.push(a)); E.setSel([a.id]);
-  const inp = [...document.querySelectorAll('#format .fsec')].find(s => /^Text/.test(s.textContent)).querySelector('input[type=color]'); inp.value = '#dddddd'; inp.dispatchEvent(new Event('change'));
+  const inp = [...document.querySelectorAll('#format .fsec')].find(s => /^Text/.test(s.textContent)).querySelector('.colorBtn'); inp.click(); const hx = document.querySelector('.colorPanel .cpHex'); hx.value = '#dddddd'; hx.dispatchEvent(new Event('input')); document.querySelector('.colorPanel .cpOk').click();
   const mine = a.style.fontColor; [...document.querySelectorAll('#format .swatches.presets .sw')].find(x => x.title.startsWith('Amber outline')).click(); const preset = a.style.strokeColor;
   E.setDiagramStyle('outline', {}); return { mine, preset, after: a.style.fontColor, id: a.id }; });
 ok(r.mine === '#dddddd', 'a colour you pick by hand is kept exactly, even though it fails');
