@@ -52,7 +52,7 @@ Only checks that do not depend on installed fonts are in baselines, so they pass
 | t29 | Diagram styles: all 20 switches, WCAG text contrast, Undo, the agreed rules in docs/STYLES.md |
 | t30 | Phosphor icons: faithful paths, draw.io stencils, Gliffy export |
 | t31 | Right-drag panning; right-click menu |
-| t32 | UI themes: contrast, remembered, Neumorphism default, page bar position |
+| t32 | App themes: contrast, remembered, Material default, white canvas in every theme, page bar position, panel modes |
 | t33 | **Security**: 29 HTML attacks, CSS injection, prototype pollution, hostile page names, editing a hostile label, exports, no network, Content Security Policy |
 | t34 | **Damaged and hostile files**: 30 files (loops, missing and duplicate ids, Infinity, decompression bomb, entity expansion, 600 shapes, 40 pages); each one is opened, edited, restyled, exported, saved and reopened |
 | t35 | **Monkey test**: thousands of seeded random mouse, keyboard and menu actions with model checks (unique ids, finite geometry, valid parents and line ends, stable save) and Undo all the way back. More: `MONKEY_SEEDS=1,2,3,4,5,6,7,8 MONKEY_STEPS=400 node test/t35.mjs` |

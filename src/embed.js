@@ -47,6 +47,7 @@ async function embedLoad(m) {
   document.body.classList.add('embed');
   embedNotice(typeof m.notice === 'string' ? m.notice : '');   // before loading, so the diagram is fitted to the space left
   if (firstTime) { buildToolbar(); closeMenus(); }
+  applyUiTheme(typeof m.appTheme === 'string' && UI_THEMES.some(t => t.id === m.appTheme) ? m.appTheme : DEFAULT_UI_THEME, false);   // not kept: the app theme is the host's or Material
   const xml = typeof m.xml === 'string' ? m.xml : '';
   const name = (title || 'Diagram').replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.drawio';
   if (xml.trim() && xml.length <= MAX_FILE_BYTES && await loadText(xml, name)) { /* loaded */ }
@@ -99,4 +100,4 @@ function prefixSvgIds(svg, p) {
 }
 COMMANDS.embedDone = embedDone;
 COMMANDS.embedCancel = embedCancel;
-Object.assign(window.DiagramEditor, { embedDone, embedCancel, embedNotice, setColourKey, fitCardBody, cardTint, makeCardBody, prefixSvgIds, EMBED, pasteXml, pasteXmlText, drawioXmlFrom, shapeKind, copyStyle, pasteStyle });
+Object.assign(window.DiagramEditor, { embedDone, embedCancel, embedNotice, setPanelMode, applyPanels, NEW_STYLE, setColourKey, fitCardBody, cardTint, makeCardBody, prefixSvgIds, EMBED, pasteXml, pasteXmlText, drawioXmlFrom, shapeKind, copyStyle, pasteStyle });

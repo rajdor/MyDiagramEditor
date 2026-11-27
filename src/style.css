@@ -239,3 +239,52 @@ kbd { background: var(--chrome); border: 1px solid var(--line); border-bottom-wi
 .colorPanel footer { display: flex; justify-content: flex-end; gap: 6px; }
 .styleCopy .btn.on { background: var(--accentSoft); }
 .frow.quick .btn { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ===== App themes shared with Data Model Studio: Studio light and dark, Midnight, High contrast, Follow system ===== */
+:root[data-ui-theme="studio-light"], :root[data-ui-theme="system"] {
+  --chrome: #ecebe5; --chrome2: #f1efe8; --line: #dedad0; --text: #1c2230; --muted: #5f6675; --faint: #a0a6b2; --tbText: #1c2230;
+  --accent: #2d55c8; --accentSoft: #e5ebfb; --panel: #faf9f5; --bar: #faf9f5; --field: #ffffff; --tile: #f1efe8; --onText: #ffffff;
+  --rulerBg: #f1efe8; --rulerMark: #c4beaf; --rulerText: #5f6675; --rulerLine: #dedad0;
+}
+:root[data-ui-theme="studio-dark"] {
+  --chrome: #0f1115; --chrome2: #1e222a; --line: #2c323d; --text: #e7e9ee; --muted: #a3abb8; --faint: #6b7383; --tbText: #e7e9ee;
+  --accent: #7f9cff; --accentSoft: #222b44; --panel: #16191f; --bar: #16191f; --field: #1e222a; --tile: #1e222a; --onText: #0c1120;
+  --rulerBg: #16191f; --rulerMark: #4a515e; --rulerText: #a3abb8; --rulerLine: #2c323d;
+  --shadowPop: 0 8px 24px rgba(0,0,0,.55); --shadowModal: 0 20px 50px rgba(0,0,0,.6); color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-ui-theme="system"] {
+    --chrome: #0f1115; --chrome2: #1e222a; --line: #2c323d; --text: #e7e9ee; --muted: #a3abb8; --faint: #6b7383; --tbText: #e7e9ee;
+    --accent: #7f9cff; --accentSoft: #222b44; --panel: #16191f; --bar: #16191f; --field: #1e222a; --tile: #1e222a; --onText: #0c1120;
+    --rulerBg: #16191f; --rulerMark: #4a515e; --rulerText: #a3abb8; --rulerLine: #2c323d;
+    --shadowPop: 0 8px 24px rgba(0,0,0,.55); --shadowModal: 0 20px 50px rgba(0,0,0,.6); color-scheme: dark;
+  }
+}
+:root[data-ui-theme="midnight"] {
+  --chrome: #0b1020; --chrome2: #18213f; --line: #2a345a; --text: #e6eaf5; --muted: #a2abc6; --faint: #6b76a0; --tbText: #e6eaf5;
+  --accent: #8fb0ff; --accentSoft: #1f2b52; --panel: #111833; --bar: #111833; --field: #18213f; --tile: #18213f; --onText: #0b1020;
+  --rulerBg: #111833; --rulerMark: #3a4677; --rulerText: #a2abc6; --rulerLine: #2a345a;
+  --shadowPop: 0 8px 24px rgba(0,0,0,.6); --shadowModal: 0 20px 50px rgba(0,0,0,.65); color-scheme: dark;
+}
+:root[data-ui-theme="high-contrast"] {
+  --chrome: #ffffff; --chrome2: #ececec; --line: #000000; --text: #000000; --muted: #333333; --faint: #555555; --tbText: #000000;
+  --accent: #0040c0; --accentSoft: #d6e2ff; --panel: #ffffff; --bar: #ffffff; --field: #ffffff; --tile: #ffffff; --onText: #ffffff;
+  --rulerBg: #ffffff; --rulerMark: #000000; --rulerText: #000000; --rulerLine: #000000; --panelLine: #000000; --fieldLine: #000000;
+}
+/* the canvas belongs to the diagram: white in every app theme, unless the diagram sets its own background */
+:root[data-ui-theme] { --canvas: #ffffff; }
+
+/* ===== side panels: hidden or sliding in over the canvas ===== */
+#main { position: relative; }
+#palette { grid-column: 1; } #center { grid-column: 2; } #format { grid-column: 3; }   /* a panel sliding in over the canvas leaves its column, so each keeps its own */
+body.pal-away #main { grid-template-columns: 0 1fr 268px; }
+body.fmt-away #main { grid-template-columns: 196px 1fr 0; }
+body.pal-away.fmt-away #main { grid-template-columns: 0 1fr 0; }
+body.pal-away #palette { position: absolute; left: 0; top: 0; bottom: 0; width: 196px; z-index: 40; transform: translateX(-102%); transition: transform .18s ease; box-shadow: var(--shadowPop); }
+body.fmt-away #format { position: absolute; right: 0; top: 0; bottom: 0; width: 268px; z-index: 40; transform: translateX(102%); transition: transform .18s ease; box-shadow: var(--shadowPop); }
+body.pal-peek #palette, body.fmt-peek #format { transform: none; }
+.paneltab { display: none; position: fixed; top: 50%; z-index: 41; border: 1px solid var(--line); background: var(--panel); color: var(--muted); font: inherit; font-size: 11px; padding: 8px 4px; cursor: pointer; writing-mode: vertical-rl; }
+.paneltab.pal { left: 0; border-left: 0; border-radius: 0 6px 6px 0; transform: rotate(180deg); }
+.paneltab.fmt { right: 0; border-right: 0; border-radius: 6px 0 0 6px; }
+body.pal-away:not(.pal-peek) .paneltab.pal, body.fmt-away:not(.fmt-peek) .paneltab.fmt { display: block; }
+body.embed .paneltab { display: none !important; }

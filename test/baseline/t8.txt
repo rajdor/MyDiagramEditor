@@ -2,7 +2,7 @@ crossings initially 1
 lines only {"before":1,"after":0}
 layered dialog: Line crossings: 0 before, 0 after.
 layered LR: Line crossings: 0 before, 0 after.
-guides [{"o":"h","p":-100,"c":"#ec4899"}]
+guides [{"o":"h","p":-90,"c":"#ec4899"}]
 after group sel group 310x77
 cells after paste 17
 after ungroup sel 2

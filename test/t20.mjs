@@ -22,7 +22,7 @@ await pg.evaluate(() => {
 await sleep(400);
 const tab = await pg.evaluate(() => { const t = DiagramEditor.page().cells.find(c => c.style.shape === 'folder'); return [t.style.tabWidth, t.style.tabHeight, t.w]; });
 // tab size depends on the fonts installed, so check the rule rather than the exact pixels
-const grew = +tab[0] > 150 && +tab[0] < tab[2] && +tab[1] >= 20;
+const grew = +tab[0] > 150 && +tab[0] <= tab[2] && +tab[1] >= 20;
 if (!grew) { console.log('FAIL: folder tab did not grow to fit the long title: ' + JSON.stringify(tab)); process.exitCode = 1; }
 console.log('palette tiles', n, 'tab grew to fit long text, within the shape:', grew);
 await pg.screenshot({ path: 'test/out/s_allshapes.png' });

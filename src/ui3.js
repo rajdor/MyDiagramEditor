@@ -724,7 +724,9 @@ function blueprintTestPage() {
 function init() {
   for (const k of ['person', 'people']) STENCIL_SHAPES[STENCIL_CODES[k]] = k;
   $('#appName').textContent = APP_NAME;
-  applyUiTheme(S.prefs.uiTheme || DEFAULT_UI_THEME);
+  applyUiTheme(S.prefs.appTheme || DEFAULT_UI_THEME, false);
+  initPanels();
+  if (!S.doc.pages.some(p => p.cells.length)) S.doc.mode = NEW_STYLE;   // the first, empty diagram starts in Fine Line too
   buildMenus(); buildToolbar(); buildPalette();
   loadPhosphor().then(() => { buildPalette(); clearCache(); requestRender(); }).catch(e => toast('Icons failed to load: ' + e.message, 5000));
   const svg = $('#svg');

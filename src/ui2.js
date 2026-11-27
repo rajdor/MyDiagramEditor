@@ -42,21 +42,61 @@ const ICONS = {
 function icon(name) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + ICONS[name] + '</svg>'; }
 
 /* ---------- UI themes: the editor's own look (not the diagram). Remembered in this browser's preferences. ---------- */
+/* The app theme dresses the app (menus, panels, toolbar), never the diagram: the canvas stays the diagram's own. The same
+   themes as Data Model Studio. Material Design unless chosen; the choice is kept only when the editor runs on its own. */
 const UI_THEMES = [
-  { id: 'classic', label: 'Classic' }, { id: 'flat-minimal', label: 'Flat / Minimal' },
-  { id: 'material', label: 'Material Design' }, { id: 'neumorphism', label: 'Neumorphism' }
+  { id: 'system', label: 'Follow system', sub: 'light or dark' }, { id: 'studio-light', label: 'Studio light' }, { id: 'studio-dark', label: 'Studio dark', dark: true },
+  { id: 'classic', label: 'Classic' }, { id: 'flat-minimal', label: 'Flat / Minimal' }, { id: 'material', label: 'Material Design' }, { id: 'neumorphism', label: 'Neumorphism' },
+  { id: 'midnight', label: 'Midnight', dark: true }, { id: 'high-contrast', label: 'High contrast' }
 ];
-const DEFAULT_UI_THEME = 'neumorphism';
-function applyUiTheme(id) {
+const DEFAULT_UI_THEME = 'material';
+const currentUiTheme = () => document.documentElement.dataset.uiTheme || 'classic';
+function applyUiTheme(id, keep) {
   if (!UI_THEMES.some(t => t.id === id)) id = DEFAULT_UI_THEME;
   if (id === 'classic') delete document.documentElement.dataset.uiTheme; else document.documentElement.dataset.uiTheme = id;
-  S.prefs.uiTheme = id; savePrefs();
+  if (keep !== false && !S.embed) { S.prefs.appTheme = id; savePrefs(); }
   if (typeof renderRulers === 'function') requestRender();
+}
+
+/* ---------- side panels: shown, hidden, auto-hide (slides in at its edge) or auto-show (format: opens when something is selected) ---------- */
+// a new diagram starts in Fine Line (Blueprint); a diagram keeps whatever style it is given
+const NEW_STYLE = 'blueprint';
+const PANEL_MODES = [['show', 'Show', 'always docked'], ['hide', 'Hide', 'open it from its tab'], ['autohide', 'Auto-hide', 'slides in at the edge'], ['autoshow', 'Auto-show', 'opens when you select something']];
+const PANEL_STATE = { pal: 'show', fmt: 'show', peek: { pal: false, fmt: false } };
+const panelMode = (k) => PANEL_STATE[k];
+function setPanelMode(k, m, keep) {
+  if (!PANEL_MODES.some(x => x[0] === m) || (k === 'pal' && m === 'autoshow')) m = 'show';
+  PANEL_STATE[k] = m; PANEL_STATE.peek[k] = false;
+  if (keep !== false && !S.embed) { S.prefs[k + 'Mode'] = m; savePrefs(); }
+  applyPanels();
+}
+function applyPanels() {
+  const b = document.body;
+  for (const k of ['pal', 'fmt']) {
+    const m = PANEL_STATE[k], away = m !== 'show' && !(m === 'autoshow' && S.sel && S.sel.length);
+    b.classList.toggle(k + '-away', away);                      // not docked: the canvas takes its room
+    b.classList.toggle(k + '-peek', away && PANEL_STATE.peek[k]); // slid in over the canvas
+  }
+  window.dispatchEvent(new Event('resize'));
+}
+function peekPanel(k, on) { if (PANEL_STATE[k] === 'show') return; if (PANEL_STATE.peek[k] === !!on) return; PANEL_STATE.peek[k] = !!on; applyPanels(); }
+function initPanels() {
+  setPanelMode('pal', S.embed ? 'show' : (S.prefs.palMode || 'show'), false); setPanelMode('fmt', S.embed ? 'show' : (S.prefs.fmtMode || 'show'), false);
+  for (const [k, sel, label] of [['pal', '#palette', 'Shapes'], ['fmt', '#format', 'Format']]) {
+    const tab = document.createElement('button'); tab.className = 'paneltab ' + k; tab.type = 'button'; tab.textContent = label; tab.title = 'Show the ' + label.toLowerCase() + ' panel';
+    tab.onclick = () => peekPanel(k, !PANEL_STATE.peek[k]); document.body.appendChild(tab);
+    const el = $(sel); el.addEventListener('mouseleave', () => { if (PANEL_STATE[k] === 'autohide' || PANEL_STATE[k] === 'autoshow') setTimeout(() => { if (!el.matches(':hover')) peekPanel(k, false); }, 250); });
+  }
+  // auto-hide: the panel slides in when the pointer reaches its edge of the window
+  document.addEventListener('pointermove', (e) => {
+    if (PANEL_STATE.pal === 'autohide' && e.clientX <= 6) peekPanel('pal', true);
+    if ((PANEL_STATE.fmt === 'autohide' || PANEL_STATE.fmt === 'autoshow') && e.clientX >= window.innerWidth - 6) peekPanel('fmt', true);
+  });
 }
 
 /* ---------- commands ---------- */
 const COMMANDS = {
-  new: () => confirmDiscard(() => { S.doc = newDoc(); S.pi = 0; S.file = { handle: null, name: 'Untitled.drawio' }; S.undo = []; S.redo = []; S.sel = []; clearCache(); setDirty(false); clearAutosave(); afterChange(); fitView(); }),
+  new: () => confirmDiscard(() => { S.doc = newDoc(); S.doc.mode = NEW_STYLE; S.pi = 0; S.file = { handle: null, name: 'Untitled.drawio' }; S.undo = []; S.redo = []; S.sel = []; clearCache(); setDirty(false); clearAutosave(); afterChange(); fitView(); }),
   open: () => openFile(), save: () => saveFile(false), saveAs: () => saveFile(true),
   exportGliffy: () => exportGliffy(), exportPng: () => exportPngDialog(), exportSvg: () => exportSvg(), exportPdf: () => exportPdf(),
   testDiagram: () => confirmDiscard(loadTestDiagram),
@@ -104,12 +144,12 @@ function menuDefs() {
   return {
     File: S.embed ? [
       { t: 'Done', c: 'embedDone', hint: 'Return the diagram to the document' }, { t: 'Cancel', c: 'embedCancel', hint: 'Close without returning changes' }, '-',
-      { t: 'UI theme', sub: UI_THEMES.map(t => ({ t: t.label, check: (S.prefs.uiTheme || DEFAULT_UI_THEME) === t.id, fn: () => { applyUiTheme(t.id); toast('UI theme: ' + t.label); } })) }
+      { t: 'App theme', sub: UI_THEMES.map(t => ({ t: t.label, check: currentUiTheme() === t.id, fn: () => { applyUiTheme(t.id); toast('App theme: ' + t.label); } })) }
     ] : [
       { t: 'New', c: 'new' }, { t: 'Open…', c: 'open', sc: 'Ctrl+O' }, { t: 'Open recent', sub: recentMenu() }, '-',
       { t: 'Save', c: 'save', sc: 'Ctrl+S' }, { t: 'Save as…', c: 'saveAs', sc: 'Ctrl+Shift+S' }, '-',
       { t: 'Export draw.io (Gliffy compatible)…', c: 'exportGliffy' }, { t: 'Export PNG…', c: 'exportPng' }, { t: 'Export SVG', c: 'exportSvg' }, { t: 'Export PDF', c: 'exportPdf' }, '-',
-      { t: 'UI theme', sub: UI_THEMES.map(t => ({ t: t.label, check: (S.prefs.uiTheme || DEFAULT_UI_THEME) === t.id, fn: () => { applyUiTheme(t.id); toast('UI theme: ' + t.label); } })) }, '-',
+      { t: 'App theme', sub: UI_THEMES.map(t => ({ t: t.label, check: currentUiTheme() === t.id, fn: () => { applyUiTheme(t.id); toast('App theme: ' + t.label); } })) }, '-',
       { t: 'Recover autosaved work…', c: 'restoreAutosave' }, { t: 'Load test diagram', c: 'testDiagram' }
     ],
     Edit: [
@@ -126,7 +166,9 @@ function menuDefs() {
       Object.assign({ t: 'Smart guides', c: 'toggleSmart' }, chk(pg.smartGuides)), Object.assign({ t: 'Rulers', c: 'toggleRulers' }, chk(pg.rulers)), '-',
       Object.assign({ t: 'Show guides', c: 'toggleGuides' }, chk(pg.guidesVisible)), Object.assign({ t: 'Lock guides', c: 'lockGuides' }, chk(pg.guidesLocked)),
       { t: 'Distribute selected guides', c: 'distributeGuides', dis: S.selGuides.length < 3 }, { t: 'Clear all guides', c: 'clearGuides', dis: !pg.guides.length }, '-',
-      { t: 'Diagram style', sub: STYLE_MODES.map(m => Object.assign({ t: m.label + ': ' + m.hint, c: 'style' + m.label }, chk(S.doc.mode === m.id))) }, { t: 'Toggle line hops on all lines', c: 'hopsAll' }
+      { t: 'Diagram style', sub: STYLE_MODES.map(m => Object.assign({ t: m.label + ': ' + m.hint, c: 'style' + m.label }, chk(S.doc.mode === m.id))) }, { t: 'Toggle line hops on all lines', c: 'hopsAll' }, '-',
+      { t: 'Shape panel', sub: PANEL_MODES.filter(m => m[0] !== 'autoshow').map(([id, label, hint]) => ({ t: label + ': ' + hint, check: panelMode('pal') === id, fn: () => setPanelMode('pal', id) })) },
+      { t: 'Format panel', sub: PANEL_MODES.map(([id, label, hint]) => ({ t: label + ': ' + hint, check: panelMode('fmt') === id, fn: () => setPanelMode('fmt', id) })) }
     ],
     Arrange: [
       { t: 'Align', sub: [{ t: 'Left', c: 'alignL' }, { t: 'Centre', c: 'alignC' }, { t: 'Right', c: 'alignR' }, '-', { t: 'Top', c: 'alignT' }, { t: 'Middle', c: 'alignM' }, { t: 'Bottom', c: 'alignB' }], dis: !multi },
@@ -946,6 +988,7 @@ function formatStyleCopy() {
   r.appendChild(b);
 }
 function buildFormat() {
+  if (PANEL_STATE.fmt === 'autoshow' && document.body.classList.contains('fmt-away') !== !(S.sel && S.sel.length)) applyPanels();   // Auto-show: open while something is selected
   const f = $('#format'); f.innerHTML = '';
   updateToolbar();
   const cs = selCells();
