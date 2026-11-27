@@ -954,7 +954,7 @@ function doResize(d, w, ev) {
       cl.x = nx + (oo.x - o.x) * sx; cl.y = ny + (oo.y - o.y) * sy; cl.w = Math.max(4, oo.w * sx); cl.h = Math.max(4, oo.h * sy);
     }
     updateGroups(page());
-  } else { c.x = round2(nx); c.y = round2(ny); c.w = round2(nw); c.h = round2(nh); }
+  } else { c.x = round2(nx); c.y = round2(ny); c.w = round2(nw); c.h = round2(nh); if (c.style.deCard === '1') fitCardBody(c); }
   setStatus('W ' + Math.round(nw) + '  H ' + Math.round(nh));
   requestRender();
 }

@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Features
+- Entity card, in Containers: a solid header band with a white title, the outline in the header colour, a light tint of the same colour as the body (same hue, very light), rounded corners, and text under the title as a text shape inside the card. Saved as a draw.io swimlane (`swimlane`, `startSize`, `fillColor`, `swimlaneFillColor`), so it opens as the same card in draw.io. A new header colour carries the outline and the tint with it until either is set on its own; the Format panel has a Body colour with Match header. Resizing fits the text to the body. The card keeps its colours in every diagram style; its font follows the style
+- draw.io swimlanes are drawn with their header band and body colour (they were plain boxes)
 - Labels holding a table (as draw.io writes a data model entity: key, name and type columns) keep their column alignment and layout: inside a table, `text-align` and the attributes `align`, `valign`, `colspan`, `rowspan`, `width`, `bgcolor`, `cellpadding`, `cellspacing` and `border` are kept, each value checked. Alignment anywhere else in a label still gives way to the shape's own (the Position grid)
 - Exported pictures (and the picture a host page such as the document editor shows) set out a label holding a table as the canvas does: each cell's fill and borders, and each line of words at its place, font and colour, as plain SVG shapes and text
 - Exported pictures: normal weight inside a bold label is no longer drawn bold

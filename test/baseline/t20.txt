@@ -1,2 +1,2 @@
-palette tiles 57 tab grew to fit long text, within the shape: true
+palette tiles 58 tab grew to fit long text, within the shape: true
 no errors

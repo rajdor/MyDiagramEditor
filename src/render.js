@@ -110,6 +110,16 @@ function shapePaths(c) {
       r = sb(st, 'absoluteArcSize', false) ? as / 2 : Math.min(w, h) * as / 100;
       r = Math.min(r, w / 2, h / 2);
     }
+    if (st.swimlane !== undefined) {
+      // draw.io swimlane: header band (fillColor), body (swimlaneFillColor), one outline and the line under the header
+      const sz = Math.min(Math.max(0, sn(st, 'startSize', 26)), h), rr = Math.min(r, sz, (h - sz) || r);
+      const body = colorOr(st, 'swimlaneFillColor', 'none');
+      if (body !== 'none' && sz < h) R.push({ d: `M${x},${y + sz}H${x + w}V${y + h - rr}Q${x + w},${y + h} ${x + w - rr},${y + h}H${x + rr}Q${x},${y + h} ${x},${y + h - rr}Z`, fill: true, fillColour: body, noStroke: true });
+      if (sz > 0) R.push({ d: `M${x},${y + sz}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + sz}Z`, fill: true, noStroke: true });
+      R.push({ d: rectD(r), fill: false });
+      if (sz > 0 && sz < h && sv(st, 'swimlaneLine', '1') !== '0') R.push({ d: `M${x},${y + sz}H${x + w}`, fill: false });
+      return R;
+    }
     R.push({ d: rectD(r), fill: true });
   }
   return R;
@@ -133,6 +143,7 @@ function labelBox(c) {
   const st = c.style, k = shapeKind(c);
   let x = c.x, y = c.y, w = c.w, h = c.h;
   if (k === 'callout') h = Math.max(1, h - sn(st, 'size', 20));
+  if (st.swimlane !== undefined) h = Math.max(1, Math.min(sn(st, 'startSize', 26), c.h));   // a swimlane's label sits in its header band
   if (k === 'cylinder' && sb(st, 'boundedLbl', false)) { const s = Math.min(sn(st, 'size', 15), h / 2); y += s * 1.5; h -= s * 2; }
   if (k === 'document' && sb(st, 'boundedLbl', false)) h -= h * sn(st, 'size', 0.3) / 2;
   const lp = sv(st, 'labelPosition', 'center'), vlp = sv(st, 'verticalLabelPosition', 'middle');
@@ -255,7 +266,7 @@ function renderVertex(c, opts) {
       else el('path', { d: p.d, fill: gf, stroke: 'none', opacity: p.alpha < 1 ? p.alpha : null }, g);
       continue;
     }
-    const f = p.wedge ? (stroke === 'none' ? '#000000' : stroke) : p.fill ? fill : 'none';
+    const f = p.wedge ? (stroke === 'none' ? '#000000' : stroke) : p.fill ? (p.fillColour || fill) : 'none';
     if (p.noStroke) { if (f !== 'none') el('path', { d: p.d, fill: f, stroke: 'none' }, g); continue; }
     if (sketch) {
       const fs = sv(st, 'fillStyle', 'solid'), rough = clamp(sn(st, 'jiggle', 1.5) * 0.66, 0.3, 2.2);

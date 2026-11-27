@@ -684,13 +684,14 @@ const SHAPE_LIB = [
   { group: 'Notes', key: 'checklist', label: 'Checklist (click a box to tick it; Enter adds an item)', w: 200, h: 70, style: 'text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;fontSize=14;fontColor=#1e293b;strokeColor=none;fillColor=none;spacingLeft=4;deChecklist=1;', value: '\u2610 First item<br>\u2610 Second item<br>\u2611 Done item' },
   { group: 'Containers', key: 'container', label: 'Container', w: 260, h: 170, style: 'rounded=1;arcSize=3;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;dashed=1;fontStyle=1;container=1;' + BASE_V.replace('fillColor=#f8fafc', 'fillColor=none'), value: 'Container' },
   { group: 'Containers', key: 'tabbed', label: 'Tabbed container (tab fits its text)', w: 260, h: 180, style: 'container=1;shape=folder;tabPosition=left;tabWidth=90;tabHeight=24;verticalAlign=top;align=left;spacingLeft=8;spacingTop=3;fontStyle=1;tabAuto=1;' + BASE_V.replace('whiteSpace=wrap;', '').replace('fillColor=#f8fafc', 'fillColor=#ffffff'), value: 'Tabbed container' },
+  { group: 'Containers', key: 'entityCard', label: 'Entity (card: title band and text)', w: 220, h: 130, style: 'swimlane;startSize=34;html=1;whiteSpace=wrap;rounded=1;absoluteArcSize=1;arcSize=20;fontStyle=1;fontSize=14;fontColor=#FFFFFF;fillColor=#1E3A5F;strokeColor=#1E3A5F;swimlaneFillColor=#EAF3FF;strokeWidth=1.5;collapsible=0;container=1;deCard=1;', value: 'Entity', withBody: 'Description' },
   { group: 'People', key: 'person', label: 'Person', w: 50, h: 60, style: 'shape=PERSON;verticalLabelPosition=bottom;verticalAlign=top;' + BASE_V, value: 'Person' },
   { group: 'People', key: 'people', label: 'People', w: 80, h: 60, style: 'shape=PEOPLE;verticalLabelPosition=bottom;verticalAlign=top;' + BASE_V, value: 'People' },
   ...[0, 25, 50, 75, 100].map(p => ({ group: 'Harvey balls', key: 'harvey' + p, label: 'Harvey ball ' + p + '%', w: 28, h: 28, style: 'ellipse;aspect=fixed;deHarvey=' + p + ';html=1;fillColor=#ffffff;strokeColor=#475569;strokeWidth=1.5;fontColor=#1e293b;', value: '' })),
   { group: 'Backgrounds', key: 'dots', label: 'Dot matrix (dots stay 20 px apart when resized)', w: 480, h: 320, style: 'rounded=0;html=1;fillColor=#ffffff;strokeColor=none;deDots=1;', value: '', back: true }
 ];
 // Shapes added in 1.1.0 (kept off the 1.0.0 self-test pages, whose drawings are approved baselines).
-const SHAPES_1_1 = new Set(['calloutPanel', 'question', 'annotation', 'checklist', 'harvey0', 'harvey25', 'harvey50', 'harvey75', 'harvey100', 'dots']);
+const SHAPES_1_1 = new Set(['entityCard', 'calloutPanel', 'question', 'annotation', 'checklist', 'harvey0', 'harvey25', 'harvey50', 'harvey75', 'harvey100', 'dots']);
 const ANNOTATION_EDGE_STYLE = 'edgeStyle=none;html=1;startArrow=none;endArrow=block;endFill=1;endSize=8;strokeColor=#B23C0B;strokeWidth=1.5;dashed=1;dashPattern=4 4;deNote=annotation;deLine=annotation;';
 const DEFAULT_EDGE_STYLE = 'edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;startArrow=none;endArrow=classic;startSize=8;endSize=8;strokeColor=#475569;strokeWidth=1.5;jumpStyle=none;';
 const ARROW_TYPES = [
@@ -712,6 +713,32 @@ function makeEdge(sketch) {
   const e = { id: uid(), parent: '1', e: true, value: '', style: parseStyle(DEFAULT_EDGE_STYLE), source: null, target: null, pts: [], sp: null, tp: null, lx: 0, ly: 0, lo: { x: 0, y: 0 }, extra: null };
   if (sketch && sketch !== 'outline') styleNewCell(e, sketch === true ? 'sketch' : sketch);
   return e;
+}
+/* Entity card: a draw.io swimlane (header band in fillColor, body in swimlaneFillColor, outline in strokeColor), marked deCard,
+   with its text as a text shape inside it (deCardBody). The outline and the body tint follow the header colour until either is
+   set on its own. */
+// the body: the header's hue, very light (OKLCH lightness 0.96) with a little of its colour, as a palette's palest shade
+function cardTint(hex) { if (!hexRgb(hex)) return '#ffffff'; const o = hexOklch(hex); return oklchHex(0.96, Math.min(o.C * 0.3, 0.025), o.H).toUpperCase(); }
+function cardHead(c) { return Math.min(Math.max(0, sn(c.style, 'startSize', 26)), c.h); }
+function makeCardBody(card, text) {
+  const b = { id: uid(), parent: card.id, v: true, value: text, style: parseStyle('text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacingLeft=10;spacingRight=10;spacingTop=8;fontSize=12;fontColor=#1E293B;strokeColor=none;fillColor=none;deCardBody=1;'),
+    x: card.x, y: card.y + cardHead(card), w: card.w, h: Math.max(10, card.h - cardHead(card)), extra: null };
+  return b;
+}
+// a card's text fills its body: after the card is resized it is fitted again
+function fitCardBody(card) {
+  const hd = cardHead(card);
+  for (const b of page().cells) if (b.parent === card.id && b.style.deCardBody === '1') { b.x = card.x; b.y = card.y + hd; b.w = card.w; b.h = Math.max(10, card.h - hd); }
+}
+// set a colour on a shape; on a card, a new header colour carries the outline and the body tint with it while they follow it
+function setColourKey(c, k, v) {
+  const st = c.style;
+  if (k === 'fillColor' && st.deCard === '1' && hexRgb(v)) {
+    const old = String(st.fillColor || '').toLowerCase();
+    if (!st.strokeColor || String(st.strokeColor).toLowerCase() === old) st.strokeColor = v;
+    if (!st.swimlaneFillColor || (hexRgb(old) && String(st.swimlaneFillColor).toLowerCase() === cardTint(old).toLowerCase())) st.swimlaneFillColor = cardTint(v);
+  }
+  st[k] = v;
 }
 // Sketch keys are draw.io's own (sketch, jiggle, fillStyle, hachureGap, fontFamily), so the file looks the same in draw.io.
 const SKETCH_ROUGH = { subtle: '0.8', normal: '1.5', rough: '2.6' };

@@ -487,6 +487,7 @@ function insertShape(d, at) {
     if (d.back) page().cells.unshift(c); else page().cells.push(c);
     S.sel = [c.id];
     if (d.withLine) { const e = makeAnnotationLine(c); page().cells.push(e); }
+    if (d.withBody) { const t = makeCardBody(c, d.withBody); if (S.doc.mode && S.doc.mode !== 'outline') styleNewCell(t, S.doc.mode); page().cells.push(t); }
     if (at.dropped && !d.back) { refreshMap(); reparentToContainers([c]); }
   });
 }
@@ -928,9 +929,9 @@ function applyStyle(fn, filter) { mutate(() => { for (const c of styleTargets())
 let colorLive = null;
 function liveColor(k, filter) {
   return (v, live) => {
-    if (live) { if (!colorLive) colorLive = snapshot(); for (const c of styleTargets()) if (!filter || filter(c)) c.style[k] = v; requestRender(); return; }
-    if (colorLive) { const pre = colorLive; colorLive = null; for (const c of styleTargets()) if (!filter || filter(c)) c.style[k] = v; refreshMap(); pushUndo(pre); afterChange({ keepPanel: true }); }
-    else applyStyle(c => { c.style[k] = v; }, filter);
+    if (live) { if (!colorLive) colorLive = snapshot(); for (const c of styleTargets()) if (!filter || filter(c)) setColourKey(c, k, v); requestRender(); return; }
+    if (colorLive) { const pre = colorLive; colorLive = null; for (const c of styleTargets()) if (!filter || filter(c)) setColourKey(c, k, v); refreshMap(); pushUndo(pre); afterChange({ keepPanel: true }); }
+    else applyStyle(c => { setColourKey(c, k, v); }, filter);
   };
 }
 // Copy style, Paste style and the painter, at the top of the panel for a selection.
@@ -1044,6 +1045,12 @@ function formatShapeStyle(verts) {
   const fillNone = sv(st, 'fillColor', '#ffffff') === 'none';
   r1.appendChild(mkColor(fillNone ? '#ffffff' : sv(st, 'fillColor', '#ffffff'), liveColor('fillColor')));
   r1.appendChild(mkChk('Transparent', fillNone, (v) => applyStyle(cl => { cl.style.fillColor = v ? 'none' : '#ffffff'; })));
+  if (st.swimlane !== undefined) {   // a card's body below its header band (follows the header colour until set here)
+    const rb = frow(s, 'Body');
+    const bodyNone = sv(st, 'swimlaneFillColor', 'none') === 'none';
+    rb.appendChild(mkColor(bodyNone ? '#ffffff' : sv(st, 'swimlaneFillColor', '#ffffff'), liveColor('swimlaneFillColor')));
+    rb.appendChild(mkBtn('Match header', () => applyStyle(cl => { if (cl.style.swimlane !== undefined) { cl.style.swimlaneFillColor = cardTint(cl.style.fillColor); cl.style.strokeColor = cl.style.fillColor; } }), '', 'Outline in the header colour and the body a light tint of it'));
+  }
   const r2 = frow(s, 'Outline');
   r2.appendChild(mkColor(sv(st, 'strokeColor', '#000000'), liveColor('strokeColor')));
   r2.appendChild(mkNum(sn(st, 'strokeWidth', 1), (v) => applyStyle(cl => { cl.style.strokeWidth = String(clamp(v, 0, 20)); }), 0.5, 0));

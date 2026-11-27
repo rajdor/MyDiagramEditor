@@ -203,10 +203,18 @@ function toSketch(c, o) {
   applySketch(c, true, o);
   if (role === 'container' && c.style.fillStyle) c.style.fillStyle = 'solid'; // hatching a whole container is too busy
 }
+function cardToStyle(c, to, o) {
+  const st = c.style;
+  if (st.fontFamily === BP.font || st.fontFamily === SKETCH_FONT) { delete st.fontFamily; delete st.fontSource; }
+  applySketch(c, false, {}); delete st.deMode;
+  if (to === 'blueprint') { bpFont(st); st.deMode = 'blueprint'; }
+  else if (to === 'sketch') applySketch(c, true, Object.assign({}, o, { fillStyle: 'solid' }));
+}
 // One cell from style `from` to style `to` (docs/STYLES.md, permutations 1 to 20).
 function convertCell(c, from, to, o, ctx) {
   if (isGroupCell(c)) return;
   if (c.style.deDots !== undefined) return; // background sheets keep their own look in every style
+  if (c.style.deCard === '1') { cardToStyle(c, to, o); return; } // an entity card keeps its colours in every style; its font follows the style
   // Containers are recognised once (no fill, dashed boxes) and marked, so they stay containers after they get a tint.
   if (!c.e && !c.isEdgeLabel && styleRole(c) === 'container' && shapeKind(c) !== 'folder' && shapeKind(c) !== 'partialRect') c.style.deCont = '1';
   if (to === 'sketch') { if (from === 'blueprint' || c.style.deMode === 'blueprint') toOutline(c, 'blueprint', Object.assign({}, STYLE_DEFAULTS.outline, { resetFont: true })); toSketch(c, o); return; }
