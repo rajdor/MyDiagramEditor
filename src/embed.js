@@ -1,7 +1,9 @@
 /* ===== Embed mode: a host page opens the editor in an iframe, passes it a diagram and gets the result back =====
    postMessage only, nothing touches the network. Messages:
      editor -> host  { type: 'de:ready' }                                   once, on start-up inside an iframe
-     host -> editor  { type: 'de:init', xml, title, mode }                  load this diagram (empty xml: a new one in `mode`)
+     host -> editor  { type: 'de:init', xml, title, mode, notice }          load this diagram (empty xml: a new one in `mode`);
+                                                                           notice: optional text shown in a bar above the canvas until
+                                                                           dismissed or the next de:init (e.g. the diagram was converted)
      editor -> host  { type: 'de:save', xml, svg, width, height, title }    Done
      editor -> host  { type: 'de:cancel' }                                  Cancel
      editor -> host  { type: 'de:dirty', dirty }                            unsaved-change flag changed
@@ -15,6 +17,7 @@ function embedPost(msg) { try { window.parent.postMessage(msg, '*'); } catch (e)
 function embedStart() {
   if (!EMBED.inFrame) return;
   window.addEventListener('message', onEmbedMessage);
+  const nb = $('#embedNotice button'); if (nb) nb.onclick = () => embedNotice('');
   embedPost({ type: 'de:ready' });
 }
 function onEmbedMessage(ev) {
@@ -42,6 +45,7 @@ async function embedLoad(m) {
   const firstTime = !S.embed;
   S.embed = true; EMBED.title = title; EMBED.lastDirty = null;
   document.body.classList.add('embed');
+  embedNotice(typeof m.notice === 'string' ? m.notice : '');   // before loading, so the diagram is fitted to the space left
   if (firstTime) { buildToolbar(); closeMenus(); }
   const xml = typeof m.xml === 'string' ? m.xml : '';
   const name = (title || 'Diagram').replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.drawio';
@@ -54,6 +58,13 @@ async function embedLoad(m) {
   }
   buildPalette(); updateTitle();
   embedDirty();
+}
+// The host's notice about this diagram, as plain text; an empty one hides the bar.
+function embedNotice(t) {
+  const bar = $('#embedNotice'); if (!bar) return;
+  const text = String(t || '').replace(/\s+/g, ' ').trim().slice(0, 500);
+  bar.querySelector('span').textContent = text; bar.hidden = !text;
+  requestRender();
 }
 function embedDirty() {
   if (!S.embed || EMBED.lastDirty === !!S.dirty) return;
@@ -88,4 +99,4 @@ function prefixSvgIds(svg, p) {
 }
 COMMANDS.embedDone = embedDone;
 COMMANDS.embedCancel = embedCancel;
-Object.assign(window.DiagramEditor, { embedDone, embedCancel, prefixSvgIds, EMBED, pasteXml, pasteXmlText, drawioXmlFrom, shapeKind, copyStyle, pasteStyle });
+Object.assign(window.DiagramEditor, { embedDone, embedCancel, embedNotice, prefixSvgIds, EMBED, pasteXml, pasteXmlText, drawioXmlFrom, shapeKind, copyStyle, pasteStyle });

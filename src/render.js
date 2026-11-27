@@ -602,7 +602,7 @@ function parseRich(html, base) {
       if (css) {
         if (css.color) ns.color = css.color;
         if (css.fontSize) { const v = parseFloat(css.fontSize); if (!isNaN(v)) ns.size = /em$/.test(css.fontSize) ? v * s.size : v; }
-        if (css.fontWeight && (css.fontWeight === 'bold' || +css.fontWeight >= 600)) ns.b = true;
+        if (css.fontWeight) { if (css.fontWeight === 'bold' || css.fontWeight === 'bolder' || +css.fontWeight >= 600) ns.b = true; else if (css.fontWeight === 'normal' || css.fontWeight === 'lighter' || +css.fontWeight < 600) ns.b = false; }   // normal inside bold is not bold, as on the canvas
         if (css.fontStyle === 'italic') ns.i = true;
         if (/underline/.test(css.textDecoration || css.textDecorationLine || '')) ns.u = true;
         if (css.fontFamily) ns.family = css.fontFamily.replace(/["']/g, '').split(',')[0];
@@ -663,9 +663,57 @@ function drawRichText(g, lines, box, align, valign) {
 }
 function exportLabel(c, g) {
   const html = labelHtml(c); if (!html) return;
+  if (/<table[\s>]/i.test(html) && exportTableLabel(c, g, html)) return;
   const st = c.style, b = labelBox(c);
   const lines = layoutRich(html, st, b.w, sv(st, 'whiteSpace', '') === 'wrap');
   drawRichText(g, lines, b, sv(st, 'align', 'center'), sv(st, 'verticalAlign', 'middle'));
+}
+/* A label holding a table (a draw.io entity: name, key and type columns) is set out by the browser, as on the canvas,
+   and copied into the picture as plain shapes: each cell's fill and borders as rectangles and lines, and each line of
+   words as text at the place, font and colour the browser gave it. The picture needs no HTML and no script. */
+function exportTableLabel(c, g, html) {
+  const st = c.style, b = labelBox(c), va = sv(st, 'verticalAlign', 'middle');
+  const host = document.createElement('div');
+  host.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none';
+  const outer = document.createElement('div');
+  outer.style.cssText = 'width:' + b.w + 'px;height:' + b.h + 'px;display:flex;flex-direction:column;justify-content:' + (va === 'top' ? 'flex-start' : va === 'bottom' ? 'flex-end' : 'center');
+  const inner = document.createElement('div');
+  inner.setAttribute('style', textCss(st) + 'text-align:' + alignCss(st) + ';white-space:' + (sv(st, 'whiteSpace', '') === 'wrap' ? 'normal' : 'nowrap') + ';overflow-wrap:break-word;word-break:normal;');
+  inner.innerHTML = html; outer.appendChild(inner); host.appendChild(outer); document.body.appendChild(host);
+  const tg = el('g', null);
+  try {
+    const o = outer.getBoundingClientRect(), X = (v) => round2(b.x + v - o.left), Y = (v) => round2(b.y + v - o.top);
+    const seen = (col) => col && !/^(transparent|rgba\([^)]*,\s*0\))$/.test(col);
+    for (const e of inner.querySelectorAll('*')) {
+      const cs = getComputedStyle(e), r = e.getBoundingClientRect(); if (!r.width || !r.height) continue;
+      if (seen(cs.backgroundColor)) el('rect', { x: X(r.left), y: Y(r.top), width: round2(r.width), height: round2(r.height), fill: cs.backgroundColor }, tg);
+      for (const [side, x1, y1, x2, y2] of [['Top', r.left, r.top, r.right, r.top], ['Bottom', r.left, r.bottom, r.right, r.bottom], ['Left', r.left, r.top, r.left, r.bottom], ['Right', r.right, r.top, r.right, r.bottom]]) {
+        const w = parseFloat(cs['border' + side + 'Width']); if (!w || cs['border' + side + 'Style'] === 'none' || !seen(cs['border' + side + 'Color'])) continue;
+        const h = w / 2, dx = side === 'Left' ? h : side === 'Right' ? -h : 0, dy = side === 'Top' ? h : side === 'Bottom' ? -h : 0;
+        el('line', { x1: X(x1 + dx), y1: Y(y1 + dy), x2: X(x2 + dx), y2: Y(y2 + dy), stroke: cs['border' + side + 'Color'], 'stroke-width': w }, tg);
+      }
+    }
+    const walk = document.createTreeWalker(inner, NodeFilter.SHOW_TEXT), rg = document.createRange();
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      const t = n.data; if (!t.trim()) continue;
+      const cs = getComputedStyle(n.parentElement), size = parseFloat(cs.fontSize) || 12, deco = cs.textDecorationLine || '';
+      const attrs = { 'font-family': fontCss(cs.fontFamily.split(',')[0].replace(/["']/g, '').trim()), 'font-size': round2(size), fill: cs.color,
+        'font-weight': parseInt(cs.fontWeight, 10) >= 600 ? 'bold' : null, 'font-style': cs.fontStyle === 'italic' ? 'italic' : null,
+        'text-decoration': /underline/.test(deco) ? 'underline' : /line-through/.test(deco) ? 'line-through' : null };
+      // the words of this piece of text, grouped by the line the browser put them on
+      const lines = []; const re = /\S+/g; let m;
+      while ((m = re.exec(t))) {
+        rg.setStart(n, m.index); rg.setEnd(n, m.index + m[0].length); const r = rg.getBoundingClientRect(); if (!r.width) continue;
+        const last = lines[lines.length - 1];
+        if (last && Math.abs(last.top - r.top) < size * 0.5) { last.end = m.index + m[0].length; } else lines.push({ top: r.top, bottom: r.bottom, left: r.left, start: m.index, end: m.index + m[0].length });
+      }
+      for (const l of lines) {
+        const txt = el('text', Object.assign({ x: X(l.left), y: Y(l.top + (l.bottom - l.top) / 2 + size * 0.35) }, attrs), tg);
+        txt.setAttribute('xml:space', 'preserve'); txt.textContent = t.slice(l.start, l.end).replace(/\s+/g, ' ');
+      }
+    }
+    g.appendChild(tg); return true;
+  } catch (e) { return false; } finally { host.remove(); }
 }
 function exportEdgeLabel(label, pos, g) {
   const html = labelHtml(label); if (!html || !htmlToPlain(html).trim()) return;

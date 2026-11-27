@@ -249,16 +249,29 @@ function safeUrl(u) {
   return !m || ['http', 'https', 'mailto', 'tel'].includes(m[1].toLowerCase());
 }
 // Inline CSS in labels: keep plain declarations; drop anything that can load a resource, run code or escape the label box.
-function safeCss(css) {
+function safeCss(css, inTable) {
   return String(css || '').split(';').map(d => d.trim()).filter(d => {
     if (!d) return false;
     const i = d.indexOf(':'); if (i < 1) return false;
     const prop = d.slice(0, i).trim().toLowerCase(), val = d.slice(i + 1).toLowerCase();
     if (!/^-?[a-z-]+$/.test(prop) || /^(position|behavior|-moz-binding|content|cursor|mask|filter)/.test(prop)) return false;
-    if (prop === 'line-height' || prop === 'text-align' || prop === 'text-align-last') return false; // the label's alignment is the shape's (the Position grid), as the exported picture draws it; alignment pasted in with the text used to override it // a label's lines are always 1.2 of their own text size, as the exported picture draws them; a fixed line height (often pasted in) made larger words overlap
+    if (prop === 'line-height') return false; // a label's lines are always 1.2 of their own text size, as the exported picture draws them; a fixed line height (often pasted in) made larger words overlap
+    if ((prop === 'text-align' || prop === 'text-align-last') && !inTable) return false; // the label's alignment is the shape's (the Position grid), as the exported picture draws it; alignment pasted in with the text used to override it. In a table it sets out columns (a draw.io entity's types to the right), so it stays there
     return !/url\s*\(|expression|image-set|@import|javascript:|[<>{}\\]/.test(val); // a backslash could hide any of these as a CSS escape
   }).join(';');
 }
+// Attributes kept inside a table in a label, each with the values it may take (the layout attributes draw.io's own labels use)
+const TABLE_ATTRS = {
+  align: (v, t) => /^(left|center|right|justify)$/i.test(v) && t !== 'TABLE',   // on a table, align floats it out of the label
+  valign: (v) => /^(top|middle|bottom|baseline)$/i.test(v),
+  colspan: (v, t) => /^\d{1,3}$/.test(v) && (t === 'TD' || t === 'TH'),
+  rowspan: (v, t) => /^\d{1,3}$/.test(v) && (t === 'TD' || t === 'TH'),
+  width: (v, t) => /^\d{1,4}(\.\d+)?%?$/.test(v) && /^(TABLE|TD|TH)$/.test(t),
+  bgcolor: (v, t) => safeColour(v) && /^(TABLE|TR|TD|TH)$/.test(t),
+  cellpadding: (v, t) => /^\d{1,2}$/.test(v) && t === 'TABLE',
+  cellspacing: (v, t) => /^\d{1,2}$/.test(v) && t === 'TABLE',
+  border: (v, t) => /^\d$/.test(v) && t === 'TABLE'
+};
 function sanitizeHtml(html) {
   if (!html) return '';
   let out = sanitizeOnce(html);
@@ -275,11 +288,13 @@ function sanitizeOnce(html) {
           if (['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'LINK', 'META'].includes(ch.tagName)) { ch.remove(); continue; }
           walk(ch); while (ch.firstChild) el.insertBefore(ch.firstChild, ch); ch.remove(); continue;
         }
+        const inTable = !!ch.closest('table');   // a table in a label sets out its own rows and columns (a draw.io entity); see safeCss
         for (const a of Array.from(ch.attributes)) {
           const n = a.name.toLowerCase();
+          if (inTable && TABLE_ATTRS[n]) { if (!TABLE_ATTRS[n](String(a.value).trim(), ch.tagName)) ch.removeAttribute(a.name); continue; }
           if (!['style', 'color', 'face', 'size', 'href'].includes(n)) ch.removeAttribute(a.name);   // align too: see safeCss
           else if (n === 'href' && (ch.tagName !== 'A' || !safeUrl(a.value))) ch.removeAttribute(a.name);
-          else if (n === 'style') { const v = safeCss(a.value); if (v) ch.setAttribute('style', v); else ch.removeAttribute('style'); }
+          else if (n === 'style') { const v = safeCss(a.value, inTable); if (v) ch.setAttribute('style', v); else ch.removeAttribute('style'); }
           else if (n === 'color' && !safeColour(a.value)) ch.removeAttribute(a.name);
           else if (n === 'face' && /[<>{};\\]/.test(a.value)) ch.removeAttribute(a.name);
         }

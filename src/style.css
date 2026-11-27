@@ -68,7 +68,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .dragGhost { position: fixed; z-index: 60; pointer-events: none; opacity: .75; }
 
 /* centre column: page tabs sit on top of the page; the active tab opens into the rulers and canvas below it */
-#center { display: grid; grid-template-rows: 30px 1fr; min-width: 0; min-height: 0; }
+#center { display: grid; grid-template-rows: 30px auto 1fr; min-width: 0; min-height: 0; }
+#center > #pagebar { grid-row: 1; } #center > #stage { grid-row: 3; }
+/* embed mode: what the host says about the diagram it opened (a conversion), in a bar above the canvas that covers nothing */
+#embedNotice { grid-row: 2; display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; background: #FEF3C7; color: #78350F; border: 1px solid #F59E0B; border-bottom-width: 2px; font-size: 13px; line-height: 1.4; position: relative; z-index: 1; }
+#embedNotice[hidden] { display: none; }
+#embedNotice span { flex: 1; }
+#embedNotice button { background: none; border: 0; color: inherit; font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; cursor: pointer; }
+#embedNotice button:hover { background: rgba(120, 53, 15, .12); }
 #stage { position: relative; overflow: hidden; background: var(--canvas); border: 1px solid var(--line); border-radius: 0 var(--radiusSm) 0 0; }
 #rulerTop { position: absolute; left: 20px; top: 0; height: 20px; width: calc(100% - 20px); background: var(--rulerBg); cursor: s-resize; }
 #rulerLeft { position: absolute; left: 0; top: 20px; width: 20px; height: calc(100% - 20px); background: var(--rulerBg); cursor: e-resize; }

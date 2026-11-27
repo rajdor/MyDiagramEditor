@@ -9,7 +9,7 @@ Messages use `postMessage`. Nothing touches the network, and the Content Securit
 | Direction | Message | Meaning |
 |---|---|---|
 | editor to host | `{ type: 'de:ready' }` | Loaded and listening. Sent once on start-up when inside an iframe |
-| host to editor | `{ type: 'de:init', xml, title, mode }` | Load this diagram. `xml` is draw.io XML, or empty for a new diagram; `mode` is the style of a new diagram (`outline`, `filled`, `duotone`, `sketch`, `neon` or `blueprint`); `title` names the diagram |
+| host to editor | `{ type: 'de:init', xml, title, mode, notice }` | Load this diagram. `xml` is draw.io XML, or empty for a new diagram; `mode` is the style of a new diagram (`outline`, `filled`, `duotone`, `sketch`, `neon` or `blueprint`); `title` names the diagram; `notice` (optional) is plain text shown in a bar above the canvas until it is dismissed or the next `de:init`, for example to say the diagram was converted from a picture |
 | editor to host | `{ type: 'de:save', xml, svg, width, height, title }` | The user pressed Done. `xml` is the whole diagram; `svg` is the current page |
 | editor to host | `{ type: 'de:cancel' }` | The user pressed Cancel (after confirming, if there were changes) |
 | editor to host | `{ type: 'de:dirty', dirty }` | The unsaved-change flag changed, so the host can warn on close |

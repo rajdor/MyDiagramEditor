@@ -25,6 +25,33 @@ const al = await ev(async () => {
   return Object.keys(vals).map(k => { const l = document.querySelector('[data-label="' + k + '"] .lbl'), tn = document.createTreeWalker(l, NodeFilter.SHOW_TEXT).nextNode(), t = document.createRange(); t.selectNodeContents(tn); return Math.round(l.getBoundingClientRect().right - t.getBoundingClientRect().right); });
 });
 ok('alignment carried in a label\'s text does not override the shape\'s: right means right', al.every(g => g <= 1), al);
+// a table in a label (a draw.io entity) keeps its own column alignment and layout attributes; bad values are dropped
+const tb = await ev(async () => {
+  const E = DiagramEditor, S = E.S; S.doc = E.newDoc(); S.pi = 0; E.clearCache();
+  const c = E.makeVertex('rect', 20, 20); c.id = 'T'; c.w = 300; c.h = 90; c.style.html = '1'; c.style.align = 'center'; c.style.verticalAlign = 'top';
+  c.value = '<table style="width:100%" cellpadding="2" cellspacing="0" border="0" align="right"><tr><td colspan="3" align="center" bgcolor="#1E3A5F" style="color:#ffffff">ENTITY</td></tr>' +
+    '<tr><td width="40" valign="top">PK</td><td style="text-align:left">registration_id</td><td align="right" id="x" onclick="x()" colspan="9999" bgcolor="url(x)">uuid</td></tr></table>';
+  E.page().cells.push(c); E.mutate(() => { }); await new Promise(r => setTimeout(r, 200));
+  const l = document.querySelector('[data-label="T"] .lbl'), tds = [...l.querySelectorAll('td')], box = l.getBoundingClientRect(), html = E.labelHtml(c);
+  const textRight = (td) => { const t = document.createRange(); t.selectNodeContents(td.firstChild); return t.getBoundingClientRect(); };
+  return { html, headSpan: tds[0].colSpan, uuidGap: Math.round(tds[3].getBoundingClientRect().right - textRight(tds[3]).right), nameGap: Math.round(textRight(tds[2]).left - tds[2].getBoundingClientRect().left), pkLeft: Math.round(tds[1].getBoundingClientRect().left - box.left) };
+});
+ok('a table in a label keeps its column alignment: the type sits at the right of its cell, the name at the left', tb.uuidGap <= 4 && tb.nameGap <= 4 && tb.pkLeft <= 4, tb);
+ok('a table keeps colspan, width, valign, bgcolor, cellpadding and cellspacing', tb.headSpan === 3 && /colspan="3"/.test(tb.html) && /width="40"/.test(tb.html) && /valign="top"/.test(tb.html) && /bgcolor="#1E3A5F"/.test(tb.html) && /cellpadding="2"/.test(tb.html) && /cellspacing="0"/.test(tb.html), tb.html);
+// the exported picture (what a host page such as the document editor shows) sets the table out the same way, with no HTML
+const ex = await ev(() => {
+  const E = DiagramEditor, svg = E.buildExportSvg(E.page(), { fonts: false }).svg, d = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  const texts = [...d.querySelectorAll('text')].map(t => ({ s: t.textContent, x: +t.getAttribute('x'), y: +t.getAttribute('y') })), fills = [...d.querySelectorAll('rect')].map(r => r.getAttribute('fill'));
+  return { texts, fills, html: /foreignObject|<td|<table/.test(svg) };
+});
+const tx = (w) => ex.texts.find(t => t.s === w) || {};
+ok('the exported picture keeps a table label\'s columns: each cell its own text, on one row, the type right of the name', !ex.html && tx('PK').y === tx('registration_id').y && tx('PK').x < tx('registration_id').x && tx('registration_id').x < tx('uuid').x && tx('uuid').x > 200 && tx('ENTITY').x > 100, ex.texts);
+ok('the exported picture keeps a table cell\'s fill', ex.fills.includes('rgb(30, 58, 95)'), ex.fills);
+const nb = await ev(() => { const E = DiagramEditor, S = E.S; S.doc = E.newDoc(); S.pi = 0; E.clearCache();
+  const c = E.makeVertex('rect', 20, 20); c.style.html = '1'; c.style.fontStyle = '1'; c.value = 'Title<br><font style="font-size:11px;font-weight:normal">sub</font>'; E.page().cells.push(c);
+  const d = new DOMParser().parseFromString(E.buildExportSvg(E.page(), { fonts: false }).svg, 'image/svg+xml'); return [...d.querySelectorAll('tspan')].map(t => [t.textContent, t.getAttribute('font-weight')]); });
+ok('the exported picture: normal weight inside a bold label is not bold', JSON.stringify(nb) === JSON.stringify([['Title', 'bold'], ['sub', null]]), nb);
+ok('in a table, bad values, ids, events and align on the table itself are dropped', !/onclick|id="x"|9999|url\(|<table[^>]*align/.test(tb.html), tb.html);
 // paste into a label being edited
 const p = await ev(async () => {
   const E = DiagramEditor, S = E.S; S.doc = E.newDoc(); S.pi = 0; E.clearCache();
